@@ -1,13 +1,77 @@
 @import "tailwindcss";
 
+@theme {
+  --color-alabaster-grey-50: #f0f1f4;
+  --color-alabaster-grey-100: #e2e4e9;
+  --color-alabaster-grey-200: #c4c9d4;
+  --color-alabaster-grey-300: #a7aebe;
+  --color-alabaster-grey-400: #8a93a8;
+  --color-alabaster-grey-500: #6c7893;
+  --color-alabaster-grey-600: #576075;
+  --color-alabaster-grey-700: #414858;
+  --color-alabaster-grey-800: #2b303b;
+  --color-alabaster-grey-900: #16181d;
+  --color-alabaster-grey-950: #0f1115;
+
+  --color-powder-blue-50: #eff2f6;
+  --color-powder-blue-100: #dee5ed;
+  --color-powder-blue-200: #bdccdb;
+  --color-powder-blue-300: #9cb2c9;
+  --color-powder-blue-400: #7b98b7;
+  --color-powder-blue-500: #5b7ea4;
+  --color-powder-blue-600: #486584;
+  --color-powder-blue-700: #364c63;
+  --color-powder-blue-800: #243342;
+  --color-powder-blue-900: #121921;
+  --color-powder-blue-950: #0d1217;
+
+  --color-pacific-blue-50: #eef6f7;
+  --color-pacific-blue-100: #dcecef;
+  --color-pacific-blue-200: #bad9de;
+  --color-pacific-blue-300: #97c7ce;
+  --color-pacific-blue-400: #74b4be;
+  --color-pacific-blue-500: #52a1ad;
+  --color-pacific-blue-600: #41818b;
+  --color-pacific-blue-700: #316168;
+  --color-pacific-blue-800: #214045;
+  --color-pacific-blue-900: #102023;
+  --color-pacific-blue-950: #0b1718;
+
+  --color-charcoal-blue-50: #f0f1f5;
+  --color-charcoal-blue-100: #e1e4ea;
+  --color-charcoal-blue-200: #c2c8d6;
+  --color-charcoal-blue-300: #a4adc1;
+  --color-charcoal-blue-400: #8691ac;
+  --color-charcoal-blue-500: #677698;
+  --color-charcoal-blue-600: #535e79;
+  --color-charcoal-blue-700: #3e475b;
+  --color-charcoal-blue-800: #292f3d;
+  --color-charcoal-blue-900: #15181e;
+  --color-charcoal-blue-950: #0e1015;
+
+  --color-carbon-black-50: #f2f2f3;
+  --color-carbon-black-100: #e4e4e7;
+  --color-carbon-black-200: #c9c9cf;
+  --color-carbon-black-300: #afafb6;
+  --color-carbon-black-400: #94949e;
+  --color-carbon-black-500: #797986;
+  --color-carbon-black-600: #61616b;
+  --color-carbon-black-700: #494950;
+  --color-carbon-black-800: #303036;
+  --color-carbon-black-900: #18181b;
+  --color-carbon-black-950: #111113;
+}
+
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #e2e8f0;
-  background: #020617;
+  color: var(--color-powder-blue-100);
+  background: var(--color-carbon-black-950);
 }
 
 body {
   margin: 0;
   min-width: 320px;
+  background:
+    radial-gradient(circle at top right, var(--color-pacific-blue-950), transparent 40rem),
+    var(--color-carbon-black-950);
 }
-
