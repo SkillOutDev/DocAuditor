@@ -15,9 +15,14 @@ document.querySelector('#app').innerHTML = `
           .map((technology) => `<span class="rounded-full border border-charcoal-blue-700 bg-charcoal-blue-900 px-4 py-2 text-sm text-powder-blue-200">${technology}</span>`)
           .join('')}
       </div>
-      <a href="/login" class="mt-10 inline-flex rounded-xl bg-pacific-blue-500 px-5 py-3 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400">
-        Prisijungti
-      </a>
+      <div class="mt-10 flex flex-wrap gap-3">
+        <a href="/login" class="inline-flex rounded-xl border border-charcoal-blue-600 px-5 py-3 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">
+          Prisijungti
+        </a>
+        <a href="/register" class="inline-flex rounded-xl bg-pacific-blue-500 px-5 py-3 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400">
+          Registruotis
+        </a>
+      </div>
     </section>
   </main>
 `;

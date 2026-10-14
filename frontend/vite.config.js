@@ -3,8 +3,13 @@ import tailwindcss from '@tailwindcss/vite';
 
 function loginRoutePlugin() {
   const rewriteLoginRoute = (req, _res, next) => {
-    if (req.method === 'GET' && req.url?.split('?')[0] === '/login') {
-      req.url = `/login.html${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`;
+    const routes = {
+      '/login': '/login.html',
+      '/register': '/register.html',
+    };
+    const route = req.url?.split('?')[0];
+    if (req.method === 'GET' && route in routes) {
+      req.url = `${routes[route]}${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`;
     }
     next();
   };
@@ -28,6 +33,7 @@ export default defineConfig({
       input: {
         main: 'index.html',
         login: 'login.html',
+        register: 'register.html',
       },
     },
   },
