@@ -36,6 +36,9 @@ document.querySelector('#app').innerHTML = `
           class="mt-4 w-full rounded-xl bg-pacific-blue-500 px-4 py-3 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300 focus:ring-offset-2 focus:ring-offset-charcoal-blue-950">
           Prisijungti
         </button>
+        <p class="mt-5 text-center text-sm text-powder-blue-400">
+          Neturite paskyros? <a href="/register" class="font-semibold text-pacific-blue-300 hover:text-pacific-blue-200">Registruotis</a>
+        </p>
       </form>
     </section>
   </main>

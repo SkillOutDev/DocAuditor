@@ -37,6 +37,25 @@ Pradinis dokumentų analizės sistemos karkasas:
 
 API sveikatos patikra: `http://localhost:8000/api/health/`.
 
+## Registracijos patikrinimas
+
+1. Įsitikinkite, kad PostgreSQL veikia (`docker compose ps db`) ir migracijos
+   pritaikytos (`python manage.py migrate` iš `backend/` aplanko).
+2. Paleiskite backend su `python manage.py runserver`, o atskirame terminale frontend
+   su `npm run dev`.
+3. Naršyklėje atidarykite `http://localhost:5173/register` ir užregistruokite
+   naudotoją. Sėkmės pranešimas reiškia, kad API sukūrė naudotoją.
+4. Norėdami patikrinti įrašą PostgreSQL, atidarykite dar vieną terminalą:
+
+   ```powershell
+   cd C:\Users\Adminas\Desktop\DocAuditor\backend
+   .\.venv\Scripts\Activate.ps1
+   python manage.py shell -c "from django.contrib.auth import get_user_model; print(list(get_user_model().objects.values('username', 'email')))"
+   ```
+
+   Užregistruotas vartotojo vardas ir el. paštas bus parodyti iš Django naudotojų
+   lentelės. Slaptažodis sąraše nerodomas ir DB saugomas maišos pavidalu.
+
 ## Duomenų bazės lentelės
 
 Django migracijos sukuria standartines autentifikacijos lenteles (`auth_*`,
