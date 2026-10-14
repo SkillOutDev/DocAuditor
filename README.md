@@ -37,6 +37,43 @@ Pradinis dokumentų analizės sistemos karkasas:
 
 API sveikatos patikra: `http://localhost:8000/api/health/`.
 
+## Duomenų bazės lentelės
+
+Django migracijos sukuria standartines autentifikacijos lenteles (`auth_*`,
+`django_*`) ir `api_document` lentelę. `api_document` saugo:
+
+- dokumento savininką;
+- failo pavadinimą, tipą ir dydį;
+- analizės būseną;
+- supaprastintą paaiškinimą ir pagrindines sąlygas;
+- sukūrimo ir atnaujinimo laiką.
+
+Pritaikyti migracijas PostgreSQL duomenų bazėje:
+
+```powershell
+cd C:\Users\legat\Desktop\Coding\DocAuditor
+docker compose up -d db
+cd backend
+C:\Users\legat\AppData\Local\Python\pythoncore-3.14-64\python.exe manage.py migrate
+```
+
+Jei pakeisite modelius, sugeneruokite naują migraciją ir ją pritaikykite:
+
+```powershell
+C:\Users\legat\AppData\Local\Python\pythoncore-3.14-64\python.exe manage.py makemigrations
+C:\Users\legat\AppData\Local\Python\pythoncore-3.14-64\python.exe manage.py migrate
+```
+
+Administratoriaus paskyrai sukurti:
+
+```powershell
+C:\Users\legat\AppData\Local\Python\pythoncore-3.14-64\python.exe manage.py createsuperuser
+```
+
+Tada administravimo langas pasiekiamas adresu
+`http://127.0.0.1:8000/admin/`. Įkelti dokumentai saugomi `backend/media/documents/`
+kataloge, o jų metaduomenys — PostgreSQL lentelėje `api_document`.
+
 ## DI tiekėjo pasirinkimas
 
 - `AI_PROVIDER=gemini` naudoja `GEMINI_API_KEY` ir `GEMINI_MODEL`;
