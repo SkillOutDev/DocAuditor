@@ -13,6 +13,25 @@ document.querySelector('#app').innerHTML = `
           Atsijungti
         </button>
       </header>
+      <div class="mb-6 rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-6 shadow-2xl shadow-black/20">
+        <h2 class="text-lg font-semibold text-alabaster-grey-50">Įkelti dokumentą</h2>
+        <form id="upload-form" novalidate class="mt-4">
+          <input id="file-input" name="file" type="file" accept=".pdf,.doc,.docx" class="hidden" />
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="choose-button" type="button"
+              class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">
+              Įkelti dokumentą
+            </button>
+            <span id="file-name" class="text-sm text-powder-blue-400">Failas nepasirinktas</span>
+          </div>
+          <p class="mt-2 text-xs text-powder-blue-500">Leidžiami PDF, DOC ir DOCX failai iki 15 MB.</p>
+          <p id="upload-message" class="mt-3 min-h-5 text-sm font-medium" aria-live="polite"></p>
+          <button id="save-button" type="submit"
+            class="mt-2 rounded-xl bg-pacific-blue-500 px-5 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 disabled:cursor-not-allowed disabled:opacity-50">
+            Išsaugoti
+          </button>
+        </form>
+      </div>
       <div class="rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-6 shadow-2xl shadow-black/20">
         <p id="documents-status" class="text-sm text-powder-blue-400" aria-live="polite">Kraunama...</p>
         <ul id="documents-list" class="divide-y divide-charcoal-blue-700/80"></ul>
@@ -55,9 +74,108 @@ async function loadDocuments() {
   }
 }
 
+const uploadForm = document.querySelector('#upload-form');
+const fileInput = document.querySelector('#file-input');
+const fileName = document.querySelector('#file-name');
+const uploadMessage = document.querySelector('#upload-message');
+const saveButton = document.querySelector('#save-button');
+const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx'];
+const MAX_FILE_SIZE = 15 * 1024 * 1024;
+const UPLOAD_FAILED = 'Nepavyko įkelti dokumento';
+
+function showUploadMessage(text, colorClass) {
+  uploadMessage.textContent = text;
+  uploadMessage.className = `mt-3 min-h-5 text-sm font-medium ${colorClass}`;
+}
+
+function validateFile(file) {
+  const name = file.name.toLowerCase();
+  if (!ALLOWED_EXTENSIONS.some((extension) => name.endsWith(extension))) {
+    return 'Leidžiami tik PDF, DOC ir DOCX failai.';
+  }
+  if (file.size > MAX_FILE_SIZE) return 'Dokumento dydis negali viršyti 15 MB.';
+  return null;
+}
+
+function getCookie(name) {
+  const match = document.cookie.split('; ').find((cookie) => cookie.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : '';
+}
+
+async function getCsrfToken() {
+  await fetch('/api/auth/csrf/', { credentials: 'same-origin' });
+  return getCookie('csrftoken');
+}
+
+document.querySelector('#choose-button').addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  uploadMessage.textContent = '';
+  if (!file) {
+    fileName.textContent = 'Failas nepasirinktas';
+    return;
+  }
+  fileName.textContent = file.name;
+  const problem = validateFile(file);
+  if (problem) {
+    fileInput.value = '';
+    fileName.textContent = 'Failas nepasirinktas';
+    showUploadMessage(problem, 'text-rose-300');
+  }
+});
+
+uploadForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const file = fileInput.files[0];
+  if (!file) {
+    showUploadMessage('Pirmiausia pasirinkite dokumentą.', 'text-amber-300');
+    return;
+  }
+  const problem = validateFile(file);
+  if (problem) {
+    showUploadMessage(problem, 'text-rose-300');
+    return;
+  }
+
+  saveButton.disabled = true;
+  saveButton.textContent = 'Saugoma...';
+  try {
+    const body = new FormData();
+    body.append('file', file);
+    const response = await fetch('/api/documents/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': await getCsrfToken() },
+      credentials: 'same-origin',
+      body,
+    });
+    if (response.status === 401) {
+      window.location.replace('/login');
+      return;
+    }
+    if (!response.ok) {
+      showUploadMessage(UPLOAD_FAILED, 'text-rose-300');
+      return;
+    }
+    showUploadMessage('Dokumentas išsaugotas sėkmingai', 'text-emerald-300');
+    uploadForm.reset();
+    fileName.textContent = 'Failas nepasirinktas';
+    await loadDocuments();
+  } catch {
+    showUploadMessage(UPLOAD_FAILED, 'text-rose-300');
+  } finally {
+    saveButton.disabled = false;
+    saveButton.textContent = 'Išsaugoti';
+  }
+});
+
 document.querySelector('#logout-button').addEventListener('click', async () => {
   try {
-    await fetch('/api/auth/logout/', { method: 'POST', credentials: 'same-origin' });
+    await fetch('/api/auth/logout/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': await getCsrfToken() },
+      credentials: 'same-origin',
+    });
   } finally {
     window.location.replace('/login');
   }
