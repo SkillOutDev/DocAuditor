@@ -6,8 +6,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.views.decorators.http import require_GET, require_POST
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.serializers import CharField, DictField, Serializer
@@ -149,6 +149,12 @@ def register(request):
         {"message": "Registracija sėkminga. Galite prisijungti."},
         status=201,
     )
+
+
+@ensure_csrf_cookie
+@require_GET
+def csrf(request):
+    return JsonResponse({"message": "CSRF slapukas nustatytas."})
 
 
 def _invalid_credentials():

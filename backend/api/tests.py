@@ -4,7 +4,7 @@ from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from api.models import MAX_DOCUMENT_SIZE, Document
@@ -207,3 +207,35 @@ class LoginAPITests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.client.get(reverse("documents")).status_code, 401)
+
+
+class DocumentUploadCSRFTests(TestCase):
+    def test_upload_from_browser_session_requires_and_accepts_csrf_token(self):
+        media_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(media_directory.cleanup)
+        get_user_model().objects.create_user(
+            username="csrf-user",
+            email="csrf@example.com",
+            password="a-secure-password",
+        )
+        client = Client(enforce_csrf_checks=True)
+        client.post(
+            reverse("login"),
+            data=json.dumps({"email": "csrf@example.com", "password": "a-secure-password"}),
+            content_type="application/json",
+        )
+        token = client.get(reverse("csrf")).cookies["csrftoken"].value
+
+        with override_settings(MEDIA_ROOT=media_directory.name):
+            rejected = client.post(
+                reverse("documents"),
+                {"file": SimpleUploadedFile("a.pdf", b"PDF")},
+            )
+            accepted = client.post(
+                reverse("documents"),
+                {"file": SimpleUploadedFile("a.pdf", b"PDF")},
+                headers={"X-CSRFToken": token},
+            )
+
+        self.assertEqual(rejected.status_code, 403)
+        self.assertEqual(accepted.status_code, 201)
