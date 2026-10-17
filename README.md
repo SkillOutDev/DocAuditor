@@ -37,6 +37,38 @@ Pradinis dokumentų analizės sistemos karkasas:
 
 API sveikatos patikra: `http://localhost:8000/api/health/`.
 
+## API dokumentacija
+
+Paleidus backend, interaktyvi Swagger UI dokumentacija pasiekiama adresu
+`http://localhost:8000/api/docs/`. OpenAPI schemą galima gauti adresu
+`http://localhost:8000/api/schema/`. Dokumentacija apima sveikatos patikrą,
+registraciją ir dokumentų sąrašo bei įkėlimo API.
+
+## Dokumentų saugojimo API
+
+Dokumentų API naudoja prisijungusio Django naudotojo sesiją. Įkėlimas priima
+`multipart/form-data` užklausą su vienu `file` lauku:
+
+```text
+POST /api/documents/
+```
+
+Priimami PDF, DOC ir DOCX failai iki 15 MiB. Sėkmės atveju API grąžina `201`,
+pranešimą „Dokumentas išsaugotas sėkmingai“ ir naujo dokumento metaduomenis.
+Neprisijungusiems naudotojams grąžinamas `401`, o netinkamam failui — `400` su
+klaidos aprašymu.
+
+Prisijungusio naudotojo dokumentų sąrašas:
+
+```text
+GET /api/documents/
+```
+
+Sąraše pateikiami tik to naudotojo dokumentai. Failai saugomi
+`MEDIA_ROOT/documents/`, o dokumentų metaduomenys — `api_document` lentelėje.
+Sesija galioja per Django autentifikaciją; šiuo metu frontend prisijungimo
+forma yra demonstracinė ir nesukuria Django sesijos.
+
 ## Registracijos patikrinimas
 
 1. Įsitikinkite, kad PostgreSQL veikia (`docker compose ps db`) ir migracijos

@@ -8,12 +8,43 @@ from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework.decorators import api_view
+from rest_framework.serializers import CharField, DictField, Serializer
 
 
-def health(request):
-    return JsonResponse({"status": "ok", "service": "docauditor-api"})
+class RegisterRequestSerializer(Serializer):
+    username = CharField(max_length=150)
+    email = CharField(max_length=254)
+    password = CharField(min_length=8, max_length=128, write_only=True)
 
 
+class RegisterResponseSerializer(Serializer):
+    message = CharField()
+
+
+class RegisterErrorSerializer(Serializer):
+    errors = DictField(child=CharField())
+
+
+@extend_schema(
+    operation_id="register",
+    summary="Register a user",
+    request=RegisterRequestSerializer,
+    responses={
+        201: RegisterResponseSerializer,
+        400: OpenApiResponse(
+            response=RegisterErrorSerializer,
+            description="Invalid request or field values.",
+        ),
+        409: OpenApiResponse(
+            response=RegisterErrorSerializer,
+            description="Username or email is already in use.",
+        ),
+    },
+    auth=[],
+)
+@api_view(["POST"])
 @csrf_exempt
 @require_POST
 def register(request):

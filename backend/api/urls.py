@@ -1,7 +1,8 @@
 from django.urls import path
-from . import views
+from .views import DocumentCollectionView, health, register
 
 urlpatterns = [
-    path("health/", views.health, name="health"),
-    path("auth/register/", views.register, name="register"),
+    path("health/", health, name="health"),
+    path("auth/register/", register, name="register"),
+    path("documents/", DocumentCollectionView.as_view(), name="documents"),
 ]
