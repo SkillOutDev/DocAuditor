@@ -6,6 +6,7 @@ function loginRoutePlugin() {
     const routes = {
       '/login': '/login.html',
       '/register': '/register.html',
+      '/documents': '/documents.html',
     };
     const route = req.url?.split('?')[0];
     if (req.method === 'GET' && route in routes) {
@@ -34,6 +35,7 @@ export default defineConfig({
         main: 'index.html',
         login: 'login.html',
         register: 'register.html',
+        documents: 'documents.html',
       },
     },
   },

@@ -148,3 +148,62 @@ class RegistrationAPITests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["message"], "Registracija sėkminga. Galite prisijungti.")
         self.assertTrue(get_user_model().objects.filter(username="new-user").exists())
+
+
+class LoginAPITests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="login-user",
+            email="Login.User@example.com",
+            password="a-secure-password",
+        )
+        self.url = reverse("login")
+
+    def post_login(self, payload):
+        return self.client.post(
+            self.url,
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def test_login_with_correct_credentials_starts_session(self):
+        response = self.post_login(
+            {"email": "login.user@example.com", "password": "a-secure-password"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["username"], "login-user")
+        self.assertEqual(self.client.get(reverse("documents")).status_code, 200)
+
+    def test_login_rejects_wrong_password_and_unknown_email(self):
+        for payload in (
+            {"email": "login.user@example.com", "password": "wrong-password"},
+            {"email": "nobody@example.com", "password": "a-secure-password"},
+            {"email": "", "password": ""},
+            {"email": "login.user@example.com"},
+            ["not", "an", "object"],
+        ):
+            response = self.post_login(payload)
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(
+                response.json()["message"], "Neteisingai suvesti prisijungimo duomenys"
+            )
+        self.assertEqual(self.client.get(reverse("documents")).status_code, 401)
+
+    def test_login_rejects_inactive_user(self):
+        self.user.is_active = False
+        self.user.save()
+
+        response = self.post_login(
+            {"email": "login.user@example.com", "password": "a-secure-password"}
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_logout_ends_session(self):
+        self.post_login({"email": "login.user@example.com", "password": "a-secure-password"})
+
+        response = self.client.post(reverse("logout"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get(reverse("documents")).status_code, 401)

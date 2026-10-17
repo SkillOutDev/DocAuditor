@@ -66,8 +66,10 @@ GET /api/documents/
 
 Sąraše pateikiami tik to naudotojo dokumentai. Failai saugomi
 `MEDIA_ROOT/documents/`, o dokumentų metaduomenys — `api_document` lentelėje.
-Sesija galioja per Django autentifikaciją; šiuo metu frontend prisijungimo
-forma yra demonstracinė ir nesukuria Django sesijos.
+Sesija galioja per Django autentifikaciją. Prisijungti galima per
+`POST /api/auth/login/` (JSON su `email` ir `password`); sėkmės atveju frontend
+nukreipia į `/documents`, o nesėkmės atveju rodo „Neteisingai suvesti prisijungimo
+duomenys“. Atsijungti galima per `POST /api/auth/logout/`.
 
 ## Registracijos patikrinimas
 
