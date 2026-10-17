@@ -1,8 +1,5 @@
 import './style.css';
 
-const DEMO_EMAIL = 'admin@gmail.com';
-const DEMO_PASSWORD = 'admin123';
-
 document.querySelector('#app').innerHTML = `
   <main class="flex min-h-screen items-center justify-center px-6 py-12">
     <section class="w-full max-w-md">
@@ -20,8 +17,8 @@ document.querySelector('#app').innerHTML = `
       <form id="login-form" novalidate class="rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-7 shadow-2xl shadow-black/20 sm:p-8">
         <div class="space-y-5">
           <div>
-            <label for="email" class="mb-2 block text-sm font-medium text-powder-blue-200">Gmail el. paštas</label>
-            <input id="email" name="email" type="email" autocomplete="email" placeholder="vardas@gmail.com" required
+            <label for="email" class="mb-2 block text-sm font-medium text-powder-blue-200">El. paštas</label>
+            <input id="email" name="email" type="email" autocomplete="email" placeholder="vardas@pastas.lt" required
               class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-4 py-3 text-sm text-alabaster-grey-50 outline-none transition placeholder:text-charcoal-blue-400 focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20" />
           </div>
           <div>
@@ -46,8 +43,14 @@ document.querySelector('#app').innerHTML = `
 
 const form = document.querySelector('#login-form');
 const message = document.querySelector('#login-message');
+const submitButton = form.querySelector('button[type="submit"]');
 
-form.addEventListener('submit', (event) => {
+function showMessage(text, colorClass) {
+  message.textContent = text;
+  message.className = `mt-5 min-h-5 text-center text-sm font-medium ${colorClass}`;
+}
+
+form.addEventListener('submit', async (event) => {
   event.preventDefault();
 
   const formData = new FormData(form);
@@ -55,17 +58,30 @@ form.addEventListener('submit', (event) => {
   const password = formData.get('password');
 
   if (!email || !password) {
-    message.textContent = 'Neįvesti prisijungimo duomenys';
-    message.className = 'mt-5 min-h-5 text-center text-sm font-medium text-amber-300';
+    showMessage('Neįvesti prisijungimo duomenys', 'text-amber-300');
     return;
   }
 
-  if (email !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
-    message.textContent = 'Prisijungimo el. paštas arba slaptažodis neteisingas';
-    message.className = 'mt-5 min-h-5 text-center text-sm font-medium text-rose-300';
-    return;
-  }
+  submitButton.disabled = true;
+  submitButton.textContent = 'Jungiamasi...';
+  try {
+    const response = await fetch('/api/auth/login/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
 
-  message.textContent = 'Prisijungta sėkmingai';
-  message.className = 'mt-5 min-h-5 text-center text-sm font-medium text-emerald-300';
+    if (response.ok) {
+      showMessage('Prisijungta sėkmingai', 'text-emerald-300');
+      window.location.assign('/documents');
+      return;
+    }
+
+    const result = await response.json().catch(() => ({}));
+    showMessage(result.message ?? 'Neteisingai suvesti prisijungimo duomenys', 'text-rose-300');
+  } catch {
+    showMessage('Nepavyko susisiekti su serveriu. Patikrinkite, ar veikia Django API.', 'text-rose-300');
+  }
+  submitButton.disabled = false;
+  submitButton.textContent = 'Prisijungti';
 });

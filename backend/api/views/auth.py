@@ -1,7 +1,7 @@
 import json
 from json import JSONDecodeError
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model, login as auth_login, logout as auth_logout
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
@@ -9,8 +9,33 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.serializers import CharField, DictField, Serializer
+
+INVALID_CREDENTIALS_MESSAGE = "Neteisingai suvesti prisijungimo duomenys"
+
+
+class LoginRequestSerializer(Serializer):
+    email = CharField(max_length=254)
+    password = CharField(max_length=128, write_only=True)
+
+
+class LoginUserSerializer(Serializer):
+    username = CharField()
+    email = CharField()
+
+
+class LoginResponseSerializer(Serializer):
+    message = CharField()
+    user = LoginUserSerializer()
+
+
+class LoginErrorSerializer(Serializer):
+    message = CharField()
+
+
+class LogoutResponseSerializer(Serializer):
+    message = CharField()
 
 
 class RegisterRequestSerializer(Serializer):
@@ -124,3 +149,73 @@ def register(request):
         {"message": "Registracija sėkminga. Galite prisijungti."},
         status=201,
     )
+
+
+def _invalid_credentials():
+    return JsonResponse({"message": INVALID_CREDENTIALS_MESSAGE}, status=401)
+
+
+@extend_schema(
+    operation_id="login",
+    summary="Log in with email and password",
+    request=LoginRequestSerializer,
+    responses={
+        200: LoginResponseSerializer,
+        401: OpenApiResponse(
+            response=LoginErrorSerializer,
+            description="Incorrect email or password.",
+        ),
+    },
+    auth=[],
+)
+@api_view(["POST"])
+@authentication_classes([])
+def login(request):
+    try:
+        data = json.loads(request.body)
+    except (JSONDecodeError, UnicodeDecodeError):
+        return _invalid_credentials()
+
+    email = data.get("email") if isinstance(data, dict) else None
+    password = data.get("password") if isinstance(data, dict) else None
+    if not isinstance(email, str) or not isinstance(password, str):
+        return _invalid_credentials()
+    email = email.strip()
+    if not email or not password or len(email) > 254 or len(password) > 128:
+        return _invalid_credentials()
+
+    User = get_user_model()
+    candidates = list(User.objects.filter(email__iexact=email)[:5])
+    if not candidates:
+        # Spend comparable time hashing so unknown emails are not distinguishable.
+        User().set_password(password)
+        return _invalid_credentials()
+
+    for candidate in candidates:
+        user = authenticate(
+            request._request, username=candidate.get_username(), password=password
+        )
+        if user is not None:
+            auth_login(request._request, user)
+            return JsonResponse(
+                {
+                    "message": "Prisijungta sėkmingai.",
+                    "user": {"username": user.get_username(), "email": user.email},
+                }
+            )
+
+    return _invalid_credentials()
+
+
+@extend_schema(
+    operation_id="logout",
+    summary="Log out the current user",
+    request=None,
+    responses={200: LogoutResponseSerializer},
+    auth=[],
+)
+@api_view(["POST"])
+@authentication_classes([])
+def logout(request):
+    auth_logout(request._request)
+    return JsonResponse({"message": "Atsijungta sėkmingai."})
