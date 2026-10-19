@@ -2,7 +2,8 @@ from pathlib import Path
 from mimetypes import guess_type
 
 from django.core.exceptions import ValidationError
-from django.http import FileResponse, JsonResponse
+from django.db import DatabaseError
+from django.http import FileResponse, HttpResponse, JsonResponse
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
@@ -199,3 +200,53 @@ class DocumentCollectionView(APIView):
             },
             status=201,
         )
+
+
+class DocumentDetailView(APIView):
+    permission_classes = [ManualDocumentAuthenticationPermission]
+
+    @extend_schema(
+        operation_id="delete_document",
+        summary="Delete the current user's document",
+        responses={
+            204: OpenApiResponse(description="Document deleted successfully."),
+            401: OpenApiResponse(
+                response=DocumentErrorResponseSerializer,
+                description="Authentication is required.",
+            ),
+            404: OpenApiResponse(
+                response=DocumentErrorResponseSerializer,
+                description="Document was not found.",
+            ),
+            500: OpenApiResponse(
+                response=DocumentErrorResponseSerializer,
+                description="Document could not be deleted.",
+            ),
+        },
+    )
+    def delete(self, request, document_id):
+        if not request.user.is_authenticated:
+            return JsonResponse(
+                {"message": "Norėdami tvarkyti dokumentus, prisijunkite."},
+                status=401,
+            )
+
+        try:
+            document = Document.objects.get(id=document_id, owner=request.user)
+        except Document.DoesNotExist:
+            return JsonResponse(
+                {"message": "Dokumento rasti nepavyko."},
+                status=404,
+            )
+
+        try:
+            if document.file:
+                document.file.delete(save=False)
+            document.delete()
+        except (OSError, DatabaseError):
+            return JsonResponse(
+                {"message": "Dokumento ištrinti nepavyko."},
+                status=500,
+            )
+
+        return HttpResponse(status=204)

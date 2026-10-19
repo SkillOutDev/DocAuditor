@@ -66,6 +66,15 @@ GET /api/documents/
 
 Sąraše pateikiami tik to naudotojo dokumentai. Failai saugomi
 `MEDIA_ROOT/documents/`, o dokumentų metaduomenys — `api_document` lentelėje.
+
+Išsaugotą dokumentą galima ištrinti:
+
+```text
+DELETE /api/documents/<document_id>/
+```
+
+Trinti gali tik dokumento savininkas. Sėkmės atveju grąžinamas `204`, o kartu
+pašalinamas ir saugomas failas bei dokumento analizės duomenys.
 Sesija galioja per Django autentifikaciją. Prisijungti galima per
 `POST /api/auth/login/` (JSON su `email` ir `password`); sėkmės atveju frontend
 nukreipia į `/documents`, o nesėkmės atveju rodo „Neteisingai suvesti prisijungimo

@@ -34,6 +34,7 @@ document.querySelector('#app').innerHTML = `
       </div>
       <div class="rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-6 shadow-2xl shadow-black/20">
         <p id="documents-status" class="text-sm text-powder-blue-400" aria-live="polite">Kraunama...</p>
+        <p id="documents-message" class="mb-2 min-h-5 text-sm font-medium" aria-live="polite"></p>
         <ul id="documents-list" class="divide-y divide-charcoal-blue-700/80"></ul>
       </div>
     </section>
@@ -44,9 +45,14 @@ document.querySelector('#app').innerHTML = `
             <h2 id="preview-title" class="truncate text-lg font-semibold text-alabaster-grey-50">Dokumento peržiūra</h2>
             <span id="preview-date" class="shrink-0 text-sm text-powder-blue-400"></span>
           </div>
-          <button id="close-preview-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-400">
-            Uždaryti
-          </button>
+          <div class="flex items-center gap-2">
+            <button id="preview-delete-button" type="button" class="rounded-xl border border-rose-400/70 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300">
+              Ištrinti
+            </button>
+            <button id="close-preview-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-400">
+              Uždaryti
+            </button>
+          </div>
         </header>
         <p id="preview-status" class="hidden px-5 py-4 text-sm text-powder-blue-400" aria-live="polite"></p>
         <iframe id="preview-frame" title="Dokumento turinio peržiūra" class="hidden min-h-0 flex-1 bg-white"></iframe>
@@ -55,10 +61,32 @@ document.querySelector('#app').innerHTML = `
         </div>
       </section>
     </div>
+    <div id="delete-dialog" class="fixed inset-0 z-20 hidden items-center justify-center bg-carbon-black-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-message">
+      <section class="w-full max-w-md rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 p-6 shadow-2xl shadow-black/40">
+        <div class="flex items-start gap-4">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-400/10 text-rose-300" aria-hidden="true">
+            <span class="text-xl">!</span>
+          </div>
+          <div>
+            <h2 id="delete-dialog-title" class="text-lg font-semibold text-alabaster-grey-50">Ištrinti dokumentą?</h2>
+            <p id="delete-dialog-message" class="mt-2 text-sm leading-6 text-powder-blue-300">Ar tikrai norite ištrinti?</p>
+          </div>
+        </div>
+        <div class="mt-6 flex justify-end gap-3">
+          <button id="cancel-delete-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-400">
+            Atšaukti
+          </button>
+          <button id="confirm-delete-button" type="button" class="rounded-xl bg-rose-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-300">
+            Patvirtinti
+          </button>
+        </div>
+      </section>
+    </div>
   </main>
 `;
 
 const status = document.querySelector('#documents-status');
+const documentsMessage = document.querySelector('#documents-message');
 const list = document.querySelector('#documents-list');
 const previewDialog = document.querySelector('#preview-dialog');
 const previewTitle = document.querySelector('#preview-title');
@@ -67,7 +95,20 @@ const previewStatus = document.querySelector('#preview-status');
 const previewFrame = document.querySelector('#preview-frame');
 const previewDownload = document.querySelector('#preview-download');
 const previewDownloadLink = document.querySelector('#preview-download-link');
+const previewDeleteButton = document.querySelector('#preview-delete-button');
+const deleteDialog = document.querySelector('#delete-dialog');
+const cancelDeleteButton = document.querySelector('#cancel-delete-button');
+const confirmDeleteButton = document.querySelector('#confirm-delete-button');
 let previewObjectUrl = '';
+let previewDocument = null;
+let pendingDeleteDocument = null;
+const DELETE_SUCCESS = 'Dokumentas sėkmingai ištrintas';
+const DELETE_FAILED = 'Klaida: nepavyko ištrinti dokumento';
+
+function showDocumentsMessage(text, colorClass) {
+  documentsMessage.textContent = text;
+  documentsMessage.className = `mb-2 min-h-5 text-sm font-medium ${colorClass}`;
+}
 
 function closePreview() {
   previewDialog.classList.add('hidden');
@@ -76,9 +117,11 @@ function closePreview() {
     URL.revokeObjectURL(previewObjectUrl);
     previewObjectUrl = '';
   }
+  previewDocument = null;
 }
 
 async function openDocumentPreview(document_) {
+  previewDocument = document_;
   previewDialog.classList.remove('hidden');
   previewTitle.textContent = document_.original_filename;
   previewDate.textContent = `· Įkelta ${new Date(document_.created_at).toLocaleDateString('lt-LT')}`;
@@ -124,35 +167,95 @@ function renderDocuments(documents) {
   for (const document_ of documents) {
     const item = document.createElement('li');
     item.className = 'border-b border-charcoal-blue-700/80 last:border-b-0';
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.dataset.documentId = document_.id;
-    button.className = 'flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left text-sm transition hover:bg-charcoal-blue-800/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-pacific-blue-400';
+    const contentButton = document.createElement('button');
+    contentButton.type = 'button';
+    contentButton.dataset.documentId = document_.id;
+    contentButton.className = 'min-w-0 flex-1 rounded-xl px-3 py-3 text-left text-sm transition hover:bg-charcoal-blue-800/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-pacific-blue-400';
     const title = document.createElement('span');
     title.className = 'font-medium text-alabaster-grey-50';
     title.textContent = document_.original_filename;
     const date = document.createElement('span');
     date.className = 'text-powder-blue-400';
     date.textContent = new Date(document_.created_at).toLocaleDateString('lt-LT');
-    button.append(title, date);
-    item.append(button);
+    contentButton.append(title, date);
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.dataset.deleteDocumentId = document_.id;
+    deleteButton.className = 'shrink-0 rounded-xl border border-rose-400/70 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300';
+    deleteButton.textContent = 'Ištrinti';
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.append(contentButton, deleteButton);
+    item.append(row);
     list.append(item);
   }
 }
 
 list.addEventListener('click', (event) => {
+  const deleteButton = event.target.closest('button[data-delete-document-id]');
+  if (deleteButton) {
+    const document_ = currentDocuments.find(({ id }) => String(id) === deleteButton.dataset.deleteDocumentId);
+    if (document_) deleteDocument(document_);
+    return;
+  }
   const button = event.target.closest('button[data-document-id]');
   if (!button) return;
   const document_ = currentDocuments.find(({ id }) => String(id) === button.dataset.documentId);
   if (document_) openDocumentPreview(document_);
 });
 
+async function deleteDocument(document_) {
+  pendingDeleteDocument = document_;
+  deleteDialog.classList.remove('hidden');
+  deleteDialog.classList.add('flex');
+  cancelDeleteButton.focus();
+}
+
+function closeDeleteDialog() {
+  deleteDialog.classList.add('hidden');
+  deleteDialog.classList.remove('flex');
+  pendingDeleteDocument = null;
+}
+
+async function confirmDelete() {
+  const document_ = pendingDeleteDocument;
+  if (!document_) return;
+  closeDeleteDialog();
+
+  try {
+    const response = await fetch(`/api/documents/${document_.id}/`, {
+      method: 'DELETE',
+      headers: { 'X-CSRFToken': await getCsrfToken() },
+      credentials: 'same-origin',
+    });
+    if (response.status === 401) {
+      window.location.replace('/login');
+      return;
+    }
+    if (!response.ok) throw new Error('Delete request failed');
+    if (previewDocument?.id === document_.id) closePreview();
+    showDocumentsMessage(DELETE_SUCCESS, 'text-emerald-300');
+    await loadDocuments();
+  } catch {
+    showDocumentsMessage(DELETE_FAILED, 'text-rose-300');
+  }
+}
+
 document.querySelector('#close-preview-button').addEventListener('click', closePreview);
+previewDeleteButton.addEventListener('click', () => {
+  if (previewDocument) deleteDocument(previewDocument);
+});
+cancelDeleteButton.addEventListener('click', closeDeleteDialog);
+confirmDeleteButton.addEventListener('click', confirmDelete);
 previewDialog.addEventListener('click', (event) => {
   if (event.target === previewDialog) closePreview();
 });
+deleteDialog.addEventListener('click', (event) => {
+  if (event.target === deleteDialog) closeDeleteDialog();
+});
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !previewDialog.classList.contains('hidden')) closePreview();
+  if (event.key === 'Escape' && !deleteDialog.classList.contains('hidden')) closeDeleteDialog();
 });
 
 let currentDocuments = [];
