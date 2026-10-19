@@ -78,6 +78,49 @@ class DocumentStorageAPITests(TestCase):
         self.assertEqual(len(documents), 1)
         self.assertEqual(documents[0]["title"], "My document")
 
+    def test_authenticated_user_can_preview_owned_document(self):
+        document = Document.objects.create(
+            owner=self.user,
+            title="Preview document",
+            file=SimpleUploadedFile(
+                "preview.pdf",
+                b"PDF content",
+                content_type="application/pdf",
+            ),
+            original_filename="preview.pdf",
+            file_size=11,
+            content_type="application/pdf",
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("document-preview", args=[document.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertEqual(b"".join(response.streaming_content), b"PDF content")
+
+    def test_document_preview_requires_ownership(self):
+        other_user = get_user_model().objects.create_user(
+            username="preview-owner",
+            password="a-secure-password",
+        )
+        document = Document.objects.create(
+            owner=other_user,
+            title="Private document",
+            file=SimpleUploadedFile("private.pdf", b"PDF"),
+            original_filename="private.pdf",
+            file_size=3,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("document-preview", args=[document.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_upload_rejects_unsupported_extension(self):
         self.client.force_login(self.user)
 
