@@ -37,13 +37,88 @@ document.querySelector('#app').innerHTML = `
         <ul id="documents-list" class="divide-y divide-charcoal-blue-700/80"></ul>
       </div>
     </section>
+    <div id="preview-dialog" class="fixed inset-0 z-10 hidden bg-carbon-black-950/80 p-4 sm:p-8" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+      <section class="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 shadow-2xl">
+        <header class="flex items-center justify-between gap-4 border-b border-charcoal-blue-700/80 px-5 py-4">
+          <div class="flex min-w-0 items-baseline gap-2">
+            <h2 id="preview-title" class="truncate text-lg font-semibold text-alabaster-grey-50">Dokumento peržiūra</h2>
+            <span id="preview-date" class="shrink-0 text-sm text-powder-blue-400"></span>
+          </div>
+          <button id="close-preview-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-400">
+            Uždaryti
+          </button>
+        </header>
+        <p id="preview-status" class="hidden px-5 py-4 text-sm text-powder-blue-400" aria-live="polite"></p>
+        <iframe id="preview-frame" title="Dokumento turinio peržiūra" class="hidden min-h-0 flex-1 bg-white"></iframe>
+        <div id="preview-download" class="hidden px-5 pb-5 text-sm text-powder-blue-400">
+          <a id="preview-download-link" class="font-semibold text-pacific-blue-300 hover:text-pacific-blue-200" download>Atsisiųsti dokumentą</a>
+        </div>
+      </section>
+    </div>
   </main>
 `;
 
 const status = document.querySelector('#documents-status');
 const list = document.querySelector('#documents-list');
+const previewDialog = document.querySelector('#preview-dialog');
+const previewTitle = document.querySelector('#preview-title');
+const previewDate = document.querySelector('#preview-date');
+const previewStatus = document.querySelector('#preview-status');
+const previewFrame = document.querySelector('#preview-frame');
+const previewDownload = document.querySelector('#preview-download');
+const previewDownloadLink = document.querySelector('#preview-download-link');
+let previewObjectUrl = '';
+
+function closePreview() {
+  previewDialog.classList.add('hidden');
+  previewFrame.src = '';
+  if (previewObjectUrl) {
+    URL.revokeObjectURL(previewObjectUrl);
+    previewObjectUrl = '';
+  }
+}
+
+async function openDocumentPreview(document_) {
+  previewDialog.classList.remove('hidden');
+  previewTitle.textContent = document_.original_filename;
+  previewDate.textContent = `· Įkelta ${new Date(document_.created_at).toLocaleDateString('lt-LT')}`;
+  previewStatus.textContent = 'Kraunama dokumento peržiūra...';
+  previewStatus.classList.remove('hidden');
+  previewFrame.classList.add('hidden');
+  previewDownload.classList.add('hidden');
+  if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+
+  try {
+    const response = await fetch(`/api/documents/${document_.id}/preview/`, {
+      credentials: 'same-origin',
+    });
+    if (response.status === 401) {
+      window.location.replace('/login');
+      return;
+    }
+    if (!response.ok) throw new Error('Preview request failed');
+
+    const blob = await response.blob();
+    previewObjectUrl = URL.createObjectURL(blob);
+    previewStatus.textContent = '';
+    if (blob.type === 'application/pdf') {
+      previewStatus.classList.add('hidden');
+      previewFrame.src = previewObjectUrl;
+      previewFrame.classList.remove('hidden');
+    } else {
+      previewStatus.textContent = 'Šio formato peržiūra naršyklėje nepalaikoma.';
+      previewDownloadLink.href = previewObjectUrl;
+      previewDownloadLink.textContent = `Atsisiųsti ${document_.original_filename}`;
+      previewDownload.classList.remove('hidden');
+    }
+  } catch {
+    previewStatus.textContent = 'Įvyko klaida. Dokumento peržiūrėti nepavyko.';
+    previewStatus.classList.remove('hidden');
+  }
+}
 
 function renderDocuments(documents) {
+  currentDocuments = documents;
   list.replaceChildren();
   status.textContent = documents.length ? '' : 'Nėra įkeltų dokumentų.';
   for (const document_ of documents) {
@@ -64,6 +139,23 @@ function renderDocuments(documents) {
     list.append(item);
   }
 }
+
+list.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-document-id]');
+  if (!button) return;
+  const document_ = currentDocuments.find(({ id }) => String(id) === button.dataset.documentId);
+  if (document_) openDocumentPreview(document_);
+});
+
+document.querySelector('#close-preview-button').addEventListener('click', closePreview);
+previewDialog.addEventListener('click', (event) => {
+  if (event.target === previewDialog) closePreview();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !previewDialog.classList.contains('hidden')) closePreview();
+});
+
+let currentDocuments = [];
 
 async function loadDocuments() {
   try {

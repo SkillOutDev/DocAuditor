@@ -1,7 +1,8 @@
 from pathlib import Path
+from mimetypes import guess_type
 
 from django.core.exceptions import ValidationError
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
@@ -67,6 +68,45 @@ def _serialize_document(document):
 
 def _original_filename(uploaded_file):
     return Path(uploaded_file.name.replace("\\", "/")).name
+
+
+def preview_document(request, document_id):
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"message": "Norėdami peržiūrėti dokumentą, prisijunkite."},
+            status=401,
+        )
+
+    try:
+        document = Document.objects.get(id=document_id, owner=request.user)
+    except Document.DoesNotExist:
+        return JsonResponse(
+            {"message": "Dokumento rasti nepavyko."},
+            status=404,
+        )
+
+    if not document.file:
+        return JsonResponse(
+            {"message": "Dokumento turinio peržiūrėti nepavyko."},
+            status=404,
+        )
+
+    content_type = document.content_type or guess_type(document.original_filename)[0]
+    try:
+        document_file = document.file.open("rb")
+    except OSError:
+        return JsonResponse(
+            {"message": "Dokumento turinio peržiūrėti nepavyko."},
+            status=404,
+        )
+
+    response = FileResponse(
+        document_file,
+        content_type=content_type or "application/octet-stream",
+    )
+    filename = Path(document.original_filename).name.replace('"', "")
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
 
 
 class DocumentCollectionView(APIView):
