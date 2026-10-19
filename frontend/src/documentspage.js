@@ -45,17 +45,22 @@ const list = document.querySelector('#documents-list');
 
 function renderDocuments(documents) {
   list.replaceChildren();
-  status.textContent = documents.length ? '' : 'Dokumentų dar nėra.';
+  status.textContent = documents.length ? '' : 'Nėra įkeltų dokumentų.';
   for (const document_ of documents) {
     const item = document.createElement('li');
-    item.className = 'flex items-center justify-between gap-4 py-3 text-sm';
+    item.className = 'border-b border-charcoal-blue-700/80 last:border-b-0';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.documentId = document_.id;
+    button.className = 'flex w-full items-center justify-between gap-4 rounded-xl px-3 py-3 text-left text-sm transition hover:bg-charcoal-blue-800/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-pacific-blue-400';
     const title = document.createElement('span');
     title.className = 'font-medium text-alabaster-grey-50';
     title.textContent = document_.original_filename;
     const date = document.createElement('span');
     date.className = 'text-powder-blue-400';
     date.textContent = new Date(document_.created_at).toLocaleDateString('lt-LT');
-    item.append(title, date);
+    button.append(title, date);
+    item.append(button);
     list.append(item);
   }
 }
