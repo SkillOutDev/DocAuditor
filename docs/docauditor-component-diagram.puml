@@ -1,0 +1,89 @@
+@startuml DocAuditorComponentDiagram
+
+title DocAuditor UML komponentų diagrama (Coad ir Yourdon)
+
+skinparam componentStyle uml2
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+top to bottom direction
+
+package "DocAuditor programų sistema" {
+  package "Vartotojo sąsajos posistemis" as Frontend {
+    component "Prisijungimo ir registracijos langai" as AuthUI
+    component "Dokumentų sąrašo langas" as DocumentsUI
+    component "Dokumento peržiūros langas" as PreviewUI
+    component "Dokumento įkėlimo forma" as UploadUI
+  }
+
+  package "Autentifikavimo posistemis" as Auth {
+    component "Registracija" as Registration
+    component "Prisijungimas" as Login
+    component "Atsijungimas ir CSRF" as SessionSecurity
+  }
+
+  package "Dokumentų valdymo posistemis" as DocumentManagement {
+    component "Dokumentų įkėlimas" as Upload
+    component "Dokumentų sąrašas" as DocumentList
+    component "Dokumento prieigos kontrolė" as AccessControl
+  }
+
+  package "Dokumento peržiūros posistemis" as DocumentPreview {
+    component "Failo peržiūros atsakymas" as PreviewResponse
+    component "PDF peržiūra" as PdfPreview
+    component "DOC/DOCX konvertavimo adapteris" as OfficeConverter
+  }
+
+  package "Dokumento analizės posistemis" as Analysis {
+    component "AI tiekėjo parinkimas" as ProviderSelection
+    component "Gemini adapteris" as GeminiAdapter
+    component "Ollama adapteris" as OllamaAdapter
+  }
+
+  package "Duomenų saugojimo posistemis" as Persistence {
+    component "Dokumento metaduomenų saugykla" as DocumentRepository
+    component "Naudotojų ir sesijų saugykla" as UserRepository
+    component "Failų saugykla" as FileStorage
+  }
+}
+
+database "PostgreSQL" as Database
+folder "Media failų katalogas" as MediaStorage
+cloud "Gemini API" as GeminiAPI
+component "Ollama serveris" as OllamaServer
+
+AuthUI --> Registration : registracijos API
+AuthUI --> Login : prisijungimo API
+AuthUI --> SessionSecurity : CSRF / sesijos API
+DocumentsUI --> DocumentList : GET /api/documents/
+UploadUI --> Upload : POST /api/documents/
+PreviewUI --> PreviewResponse : GET /api/documents/{id}/preview/
+
+Registration --> UserRepository : naudotojo duomenys
+Login --> UserRepository : naudotojo duomenys
+SessionSecurity --> UserRepository : sesijos būsena
+
+Upload --> AccessControl : naudotojo patikra
+Upload --> DocumentRepository : metaduomenys
+Upload --> FileStorage : originalus failas
+DocumentList --> AccessControl : savininko patikra
+DocumentList --> DocumentRepository : naudotojo dokumentai
+
+PreviewResponse --> AccessControl : savininko patikra
+PreviewResponse --> DocumentRepository : dokumento paieška
+PreviewResponse --> FileStorage : failo skaitymas
+PdfPreview --> PreviewResponse : PDF turinys
+OfficeConverter --> PreviewResponse : sugeneruotas PDF
+OfficeConverter ..> FileStorage : planuojama konversija
+
+ProviderSelection --> DocumentRepository : analizės būsena ir rezultatai
+ProviderSelection --> GeminiAdapter
+ProviderSelection --> OllamaAdapter
+GeminiAdapter --> GeminiAPI : generate content
+OllamaAdapter --> OllamaServer : /api/generate
+
+DocumentRepository --> Database
+UserRepository --> Database
+FileStorage --> MediaStorage
+
+@enduml

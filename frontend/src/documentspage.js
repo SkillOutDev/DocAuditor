@@ -170,7 +170,7 @@ function renderDocuments(documents) {
     const contentButton = document.createElement('button');
     contentButton.type = 'button';
     contentButton.dataset.documentId = document_.id;
-    contentButton.className = 'min-w-0 flex-1 rounded-xl px-3 py-3 text-left text-sm transition hover:bg-charcoal-blue-800/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-pacific-blue-400';
+    contentButton.className = 'min-w-0 flex-1 rounded-xl px-3 py-3 text-left text-sm transition hover:bg-charcoal-blue-800/60 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-pacific-blue-400 flex flex-col gap-1';
     const title = document.createElement('span');
     title.className = 'font-medium text-alabaster-grey-50';
     title.textContent = document_.original_filename;

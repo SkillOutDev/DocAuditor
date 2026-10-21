@@ -1,0 +1,146 @@
+@startuml DocAuditorClassDiagram
+
+title DocAuditor konceptinio lygmens UML klasių diagrama
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+
+class User {
+  -username: String
+  -email: String
+  -passwordHash: String
+}
+
+class AuthenticationSession {
+  -sessionId: String
+  -createdAt: DateTime
+  -expiresAt: DateTime
+  -status: AuthenticationStatus
+  +login()
+  +logout()
+  +isActive(): Boolean
+}
+
+class LoginCredentials <<structured>> {
+  -email: String
+  -password: String
+  +validate(): Boolean
+}
+
+class Document {
+  -id: Integer
+  -title: String
+  -originalFilename: String
+  -fileSize: Integer
+  -contentType: String
+  -createdAt: DateTime
+  -updatedAt: DateTime
+  -analysisStatus: AnalysisStatus
+  +fullClean()
+  +save()
+  +toString(): String
+}
+
+class DocumentFile <<structured>> {
+  -path: String
+  -format: DocumentFormat
+  -size: Integer
+}
+
+class DocumentAnalysis {
+  -simplifiedExplanation: String
+  -analysisError: String
+  -analyzedAt: DateTime
+}
+
+class KeyCondition {
+  -text: String
+  -importance: Integer
+}
+
+abstract class AIProvider {
+  +generate(prompt: String): String
+}
+
+class GeminiProvider {
+  -model: String
+  +__init__()
+  +generate(prompt: String): String
+}
+
+class OllamaProvider {
+  -baseUrl: String
+  -model: String
+  +__init__()
+  +generate(prompt: String): String
+}
+
+class DocumentCollection {
+  -documents: List<Document>
+  +listDocuments(): List<Document>
+  +uploadDocument(file: DocumentFile): Document
+  +previewDocument(id: Integer): DocumentFile
+  +add(document: Document)
+  +findById(id: Integer): Document
+}
+
+enum AnalysisStatus {
+  PENDING
+  ANALYZING
+  COMPLETED
+  FAILED
+}
+
+enum DocumentFormat {
+  PDF
+  DOC
+  DOCX
+}
+
+enum AuthenticationStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+User "1" -- "0..*" Document : owns >
+User "1" -- "0..*" AuthenticationSession : starts >
+AuthenticationSession "1" *-- "1" LoginCredentials : uses >
+Document "1" *-- "1" DocumentFile : contains >
+Document "1" *-- "0..1" DocumentAnalysis : has >
+DocumentAnalysis "1" *-- "0..*" KeyCondition : identifies >
+Document "1" --> "1" AnalysisStatus : has status >
+DocumentFile "1" --> "1" DocumentFormat : has format >
+AuthenticationSession "1" --> "1" AuthenticationStatus : has status >
+DocumentCollection "1" o-- "0..*" Document : groups >
+DocumentAnalysis ..> AIProvider : requests analysis >
+AIProvider <|.. GeminiProvider
+AIProvider <|.. OllamaProvider
+
+note right of Document
+  Projekto klasė:
+  backend/api/models.py
+end note
+
+note right of AIProvider
+  Projekto klasės:
+  backend/api/ai.py
+end note
+
+note bottom of DocumentFile
+  Structured class: dokumento failo metaduomenys.
+  Ji apibendrina Document.file, file_size
+  ir content_type reikšmes.
+end note
+
+note bottom of AnalysisStatus
+  Projekto enum:
+  Document.AnalysisStatus
+end note
+
+note "DocumentFormat ir AuthenticationStatus yra konceptinio lygmens enum tipai,\n išvesti iš sistemos failų ir autentifikavimo taisyklių." as ConceptualEnums
+ConceptualEnums .. DocumentFormat
+ConceptualEnums .. AuthenticationStatus
+
+@enduml
