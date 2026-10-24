@@ -11,6 +11,8 @@ dist/
 staticfiles/
 media/
 .pytest_cache/
+.coverage
+coverage/
 .mypy_cache/
 .DS_Store
 
