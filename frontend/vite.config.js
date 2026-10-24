@@ -26,6 +26,10 @@ function loginRoutePlugin() {
   };
 }
 
+const apiProxy = {
+  '/api': 'http://127.0.0.1:8000',
+};
+
 export default defineConfig({
   plugins: [loginRoutePlugin(), tailwindcss()],
   appType: 'mpa',
@@ -41,8 +45,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      '/api': 'http://127.0.0.1:8000',
-    },
+    proxy: apiProxy,
+  },
+  preview: {
+    port: 4173,
+    proxy: apiProxy,
   },
 });
