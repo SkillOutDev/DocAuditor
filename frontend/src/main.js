@@ -1,4 +1,5 @@
 import './style.css';
+import { initializeThemeToggle } from './theme.js';
 
 document.querySelector('#app').innerHTML = `
   <main class="min-h-screen px-6 py-16">
@@ -26,3 +27,5 @@ document.querySelector('#app').innerHTML = `
     </section>
   </main>
 `;
+
+initializeThemeToggle();

@@ -1,4 +1,5 @@
 import './style.css';
+import { initializeThemeToggle } from './theme.js';
 
 document.querySelector('#app').innerHTML = `
   <main class="flex min-h-screen items-center justify-center px-6 py-12">
@@ -40,6 +41,8 @@ document.querySelector('#app').innerHTML = `
     </section>
   </main>
 `;
+
+initializeThemeToggle();
 
 const form = document.querySelector('#login-form');
 const message = document.querySelector('#login-message');
