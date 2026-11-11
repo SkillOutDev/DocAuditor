@@ -141,6 +141,10 @@ kataloge, o jų metaduomenys — PostgreSQL lentelėje `api_document`.
 - `AI_PROVIDER=gemini` naudoja `GEMINI_API_KEY` ir `GEMINI_MODEL`;
 - `AI_PROVIDER=ollama` naudoja `OLLAMA_BASE_URL` ir `OLLAMA_MODEL`.
 
+Klausimai apie pasirinktą dokumentą per pokalbio langą visada siunčiami į
+Gemini API. Backend aplinkoje turi būti nustatytas `GEMINI_API_KEY`; pasirenkamas
+`GEMINI_MODEL` numatytai yra `gemini-2.5-flash`.
+
 Ollama atveju atskirai įdiekite Ollama ir atsisiųskite pasirinktą modelį, pavyzdžiui:
 
 ```powershell
