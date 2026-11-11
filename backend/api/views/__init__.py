@@ -3,6 +3,7 @@ from .documents import (
     DocumentCollectionView,
     DocumentDetailView,
     ask_document_question,
+    compare_document_versions,
     preview_document,
 )
 from .health import health
@@ -11,6 +12,7 @@ __all__ = [
     "DocumentCollectionView",
     "DocumentDetailView",
     "ask_document_question",
+    "compare_document_versions",
     "csrf",
     "health",
     "login",

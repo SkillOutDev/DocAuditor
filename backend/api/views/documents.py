@@ -61,6 +61,15 @@ class DocumentQuestionResponseSerializer(Serializer):
     answer = CharField()
 
 
+class DocumentComparisonRequestSerializer(Serializer):
+    first_document_id = IntegerField()
+    second_document_id = IntegerField()
+
+
+class DocumentComparisonResponseSerializer(Serializer):
+    report = CharField()
+
+
 class ManualDocumentAuthenticationPermission(AllowAny):
     """Let the view return its existing 401 response for anonymous requests."""
 
@@ -172,6 +181,83 @@ def ask_document_question(request, document_id):
     if not answer:
         return JsonResponse({"message": "Nepavyko sukurti pokalbio."}, status=502)
     return JsonResponse({"answer": answer})
+
+
+@extend_schema(
+    operation_id="compare_document_versions",
+    summary="Compare two versions of a document",
+    request=DocumentComparisonRequestSerializer,
+    responses={
+        200: DocumentComparisonResponseSerializer,
+        400: OpenApiResponse(response=DocumentErrorResponseSerializer),
+        401: OpenApiResponse(response=DocumentErrorResponseSerializer),
+        404: OpenApiResponse(response=DocumentErrorResponseSerializer),
+        502: OpenApiResponse(response=DocumentErrorResponseSerializer),
+    },
+)
+def compare_document_versions(request):
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"message": "Norėdami lyginti dokumentus, prisijunkite."},
+            status=401,
+        )
+
+    try:
+        payload = json.loads(request.body or "{}")
+        first_id = int(payload.get("first_document_id"))
+        second_id = int(payload.get("second_document_id"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return JsonResponse(
+            {"message": "Nepasirinkti dokumentai palyginimui"},
+            status=400,
+        )
+
+    if first_id == second_id:
+        return JsonResponse(
+            {"message": "Nepasirinkti dokumentai palyginimui"},
+            status=400,
+        )
+
+    documents = list(
+        Document.objects.filter(
+            owner=request.user,
+            id__in=(first_id, second_id),
+        )
+    )
+    if len(documents) != 2 or documents[0].title != documents[1].title:
+        return JsonResponse(
+            {"message": "Dokumentų palyginti nepavyko"},
+            status=400,
+        )
+
+    first = next(document for document in documents if document.id == first_id)
+    second = next(document for document in documents if document.id == second_id)
+    prompt = (
+        "Atsakyk lietuviškai ir palygink dvi to paties dokumento versijas. "
+        "Pateik aiškią ataskaitą punktais: kas pridėta, pašalinta arba pakeista. "
+        "Jei pateiktos informacijos nepakanka, tai aiškiai nurodyk.\n\n"
+        f"Dokumentas: {first.title}\n"
+        f"Pirma versija ({first.original_filename}, {first.created_at.isoformat()}):\n"
+        f"Paaiškinimas: {first.simplified_explanation or 'Nėra.'}\n"
+        f"Sąlygos: {first.key_conditions or 'Nėra.'}\n\n"
+        f"Antra versija ({second.original_filename}, {second.created_at.isoformat()}):\n"
+        f"Paaiškinimas: {second.simplified_explanation or 'Nėra.'}\n"
+        f"Sąlygos: {second.key_conditions or 'Nėra.'}"
+    )
+    try:
+        report = get_gemini_provider().generate(prompt).strip()
+    except (AIProviderError, OSError, KeyError, ValueError):
+        return JsonResponse(
+            {"message": "Dokumentų palyginti nepavyko"},
+            status=502,
+        )
+
+    if not report:
+        return JsonResponse(
+            {"message": "Dokumentų palyginti nepavyko"},
+            status=502,
+        )
+    return JsonResponse({"report": report})
 
 
 class DocumentCollectionView(APIView):

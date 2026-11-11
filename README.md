@@ -35,11 +35,6 @@ Pradinis dokumentų analizės sistemos karkasas:
    npm run dev
    ```
 
-Vietiniam testavimui be Docker PostgreSQL galima naudoti SQLite. Į `.env` įrašykite
-`DJANGO_DATABASE=sqlite`, tada paleiskite `python manage.py migrate` iš `backend/`
-aplanko. SQLite duomenų bazė (`backend/db.sqlite3`) ir vietiniai dokumentai nėra
-sekami Git.
-
 API sveikatos patikra: `http://localhost:8000/api/health/`.
 
 ## API dokumentacija

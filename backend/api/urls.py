@@ -3,6 +3,7 @@ from .views import (
     DocumentCollectionView,
     DocumentDetailView,
     ask_document_question,
+    compare_document_versions,
     csrf,
     health,
     login,
@@ -21,4 +22,5 @@ urlpatterns = [
     path("documents/<int:document_id>/", DocumentDetailView.as_view(), name="document-detail"),
     path("documents/<int:document_id>/preview/", preview_document, name="document-preview"),
     path("documents/<int:document_id>/chat/", ask_document_question, name="document-chat"),
+    path("documents/compare/", compare_document_versions, name="document-compare"),
 ]
