@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     DocumentCollectionView,
     DocumentDetailView,
+    ask_document_question,
     csrf,
     health,
     login,
@@ -19,4 +20,5 @@ urlpatterns = [
     path("documents/", DocumentCollectionView.as_view(), name="documents"),
     path("documents/<int:document_id>/", DocumentDetailView.as_view(), name="document-detail"),
     path("documents/<int:document_id>/preview/", preview_document, name="document-preview"),
+    path("documents/<int:document_id>/chat/", ask_document_question, name="document-chat"),
 ]

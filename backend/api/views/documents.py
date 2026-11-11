@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from mimetypes import guess_type
 
@@ -18,6 +19,7 @@ from rest_framework.serializers import (
 from rest_framework.views import APIView
 
 from api.models import Document
+from api.ai import AIProviderError, get_gemini_provider
 
 
 class DocumentSerializer(Serializer):
@@ -49,6 +51,14 @@ class DocumentUploadResponseSerializer(Serializer):
 class DocumentErrorResponseSerializer(Serializer):
     message = CharField()
     errors = DictField(child=JSONField(), required=False)
+
+
+class DocumentQuestionRequestSerializer(Serializer):
+    question = CharField(max_length=2000)
+
+
+class DocumentQuestionResponseSerializer(Serializer):
+    answer = CharField()
 
 
 class ManualDocumentAuthenticationPermission(AllowAny):
@@ -108,6 +118,60 @@ def preview_document(request, document_id):
     filename = Path(document.original_filename).name.replace('"', "")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
+
+
+@extend_schema(
+    operation_id="ask_document_question",
+    summary="Ask a question about a document",
+    request=DocumentQuestionRequestSerializer,
+    responses={
+        200: DocumentQuestionResponseSerializer,
+        400: OpenApiResponse(response=DocumentErrorResponseSerializer),
+        401: OpenApiResponse(response=DocumentErrorResponseSerializer),
+        404: OpenApiResponse(response=DocumentErrorResponseSerializer),
+        502: OpenApiResponse(response=DocumentErrorResponseSerializer),
+    },
+)
+def ask_document_question(request, document_id):
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"message": "Norėdami klausti apie dokumentą, prisijunkite."},
+            status=401,
+        )
+
+    try:
+        document = Document.objects.get(id=document_id, owner=request.user)
+    except Document.DoesNotExist:
+        return JsonResponse({"message": "Dokumento rasti nepavyko."}, status=404)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+    question = str(payload.get("question", "")).strip()
+    if not question:
+        return JsonResponse(
+            {"message": "Klausimas negali būti tuščias."},
+            status=400,
+        )
+
+    prompt = (
+        "Atsakyk lietuviškai į naudotojo klausimą apie pasirinktą dokumentą. "
+        "Remkis tik pateikta dokumento informacija. Jei informacijos nepakanka, "
+        "aiškiai tai pasakyk ir nesugalvok faktų.\n\n"
+        f"Dokumento pavadinimas: {document.original_filename}\n"
+        f"Dokumento paaiškinimas: {document.simplified_explanation or 'Nėra.'}\n"
+        f"Pagrindinės sąlygos: {document.key_conditions or 'Nėra.'}\n\n"
+        f"Naudotojo klausimas: {question}"
+    )
+    try:
+        answer = get_gemini_provider().generate(prompt).strip()
+    except (AIProviderError, OSError, KeyError, ValueError):
+        return JsonResponse({"message": "Nepavyko sukurti pokalbio."}, status=502)
+
+    if not answer:
+        return JsonResponse({"message": "Nepavyko sukurti pokalbio."}, status=502)
+    return JsonResponse({"answer": answer})
 
 
 class DocumentCollectionView(APIView):

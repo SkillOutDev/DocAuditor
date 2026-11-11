@@ -8,6 +8,10 @@ class AIProvider(Protocol):
     def generate(self, prompt: str) -> str: ...
 
 
+class AIProviderError(Exception):
+    """Raised when an AI provider cannot answer a request."""
+
+
 class GeminiProvider:
     def __init__(self):
         from google import genai
@@ -43,3 +47,6 @@ def get_ai_provider() -> AIProvider:
         return OllamaProvider()
     raise ValueError(f"Unsupported AI_PROVIDER: {provider}")
 
+
+def get_gemini_provider() -> AIProvider:
+    return GeminiProvider()

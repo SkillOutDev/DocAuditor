@@ -50,9 +50,33 @@ document.querySelector('#app').innerHTML = `
             <button id="preview-delete-button" type="button" class="rounded-xl border border-rose-400/70 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300">
               Ištrinti
             </button>
+            <button id="ask-document-button" type="button" class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">
+              Paklausk apie dokumentą
+            </button>
             <button id="close-preview-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-400">
               Uždaryti
             </button>
+          </div>
+          <div id="chat-dialog" class="fixed inset-0 z-30 hidden items-center justify-center bg-carbon-black-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="chat-title">
+            <section class="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 shadow-2xl">
+              <header class="flex items-center justify-between gap-4 border-b border-charcoal-blue-700/80 px-5 py-4">
+                <div class="min-w-0">
+                  <h2 id="chat-title" class="truncate text-lg font-semibold text-alabaster-grey-50">Klausti apie dokumentą</h2>
+                  <p id="chat-document-name" class="truncate text-sm text-powder-blue-400"></p>
+                </div>
+                <button id="close-chat-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">
+                  Uždaryti
+                </button>
+              </header>
+              <div id="chat-messages" class="min-h-48 flex-1 space-y-3 overflow-y-auto p-5" aria-live="polite">
+                <p id="chat-empty" class="text-sm text-powder-blue-400">Parašykite klausimą apie pasirinkto dokumento sąlygas.</p>
+              </div>
+              <form id="chat-form" class="border-t border-charcoal-blue-700/80 p-5">
+                <label for="chat-input" class="sr-only">Jūsų klausimas</label>
+                <textarea id="chat-input" rows="2" maxlength="2000" placeholder="Įrašykite klausimą ir paspauskite Enter..." class="w-full resize-none rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-4 py-3 text-sm text-alabaster-grey-50 outline-none transition placeholder:text-charcoal-blue-400 focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20"></textarea>
+                <p id="chat-message" class="mt-2 min-h-5 text-sm font-medium" aria-live="polite"></p>
+              </form>
+            </section>
           </div>
         </header>
         <p id="preview-status" class="hidden px-5 py-4 text-sm text-powder-blue-400" aria-live="polite"></p>
@@ -99,12 +123,22 @@ const previewFrame = document.querySelector('#preview-frame');
 const previewDownload = document.querySelector('#preview-download');
 const previewDownloadLink = document.querySelector('#preview-download-link');
 const previewDeleteButton = document.querySelector('#preview-delete-button');
+const askDocumentButton = document.querySelector('#ask-document-button');
+const chatDialog = document.querySelector('#chat-dialog');
+const closeChatButton = document.querySelector('#close-chat-button');
+const chatDocumentName = document.querySelector('#chat-document-name');
+const chatMessages = document.querySelector('#chat-messages');
+const chatEmpty = document.querySelector('#chat-empty');
+const chatForm = document.querySelector('#chat-form');
+const chatInput = document.querySelector('#chat-input');
+const chatMessage = document.querySelector('#chat-message');
 const deleteDialog = document.querySelector('#delete-dialog');
 const cancelDeleteButton = document.querySelector('#cancel-delete-button');
 const confirmDeleteButton = document.querySelector('#confirm-delete-button');
 let previewObjectUrl = '';
 let previewDocument = null;
 let pendingDeleteDocument = null;
+let chatDocument = null;
 const DELETE_SUCCESS = 'Dokumentas sėkmingai ištrintas';
 const DELETE_FAILED = 'Klaida: nepavyko ištrinti dokumento';
 
@@ -119,6 +153,32 @@ function closePreview() {
   if (previewObjectUrl) {
     URL.revokeObjectURL(previewObjectUrl);
     previewObjectUrl = '';
+  }
+
+  function openChat() {
+    if (!previewDocument) return;
+    chatDocument = previewDocument;
+    chatDocumentName.textContent = previewDocument.original_filename;
+    chatDialog.classList.remove('hidden');
+    chatDialog.classList.add('flex');
+    chatInput.focus();
+  }
+
+  function closeChat() {
+    chatDialog.classList.add('hidden');
+    chatDialog.classList.remove('flex');
+    chatDocument = null;
+  }
+
+  function addChatMessage(text, sender) {
+    chatEmpty.classList.add('hidden');
+    const message = document.createElement('p');
+    message.className = sender === 'user'
+      ? 'ml-auto max-w-[85%] rounded-xl bg-pacific-blue-500 px-4 py-3 text-sm text-carbon-black-950'
+      : 'max-w-[85%] rounded-xl bg-charcoal-blue-800 px-4 py-3 text-sm text-alabaster-grey-50';
+    message.textContent = text;
+    chatMessages.append(message);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
   }
   previewDocument = null;
 }
@@ -248,6 +308,11 @@ document.querySelector('#close-preview-button').addEventListener('click', closeP
 previewDeleteButton.addEventListener('click', () => {
   if (previewDocument) deleteDocument(previewDocument);
 });
+askDocumentButton.addEventListener('click', openChat);
+closeChatButton.addEventListener('click', closeChat);
+chatDialog.addEventListener('click', (event) => {
+  if (event.target === chatDialog) closeChat();
+});
 cancelDeleteButton.addEventListener('click', closeDeleteDialog);
 confirmDeleteButton.addEventListener('click', confirmDelete);
 previewDialog.addEventListener('click', (event) => {
@@ -259,6 +324,49 @@ deleteDialog.addEventListener('click', (event) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && !previewDialog.classList.contains('hidden')) closePreview();
   if (event.key === 'Escape' && !deleteDialog.classList.contains('hidden')) closeDeleteDialog();
+  if (event.key === 'Escape' && !chatDialog.classList.contains('hidden')) closeChat();
+});
+
+chatForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const question = chatInput.value.trim();
+  if (!question || !chatDocument) return;
+  addChatMessage(question, 'user');
+  chatInput.value = '';
+  chatInput.disabled = true;
+  chatMessage.textContent = 'Ruošiamas atsakymas...';
+  chatMessage.className = 'mt-2 min-h-5 text-sm font-medium text-powder-blue-400';
+  try {
+    const response = await fetch(`/api/documents/${chatDocument.id}/chat/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': await getCsrfToken(),
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ question }),
+    });
+    if (response.status === 401) {
+      window.location.replace('/login');
+      return;
+    }
+    if (!response.ok) throw new Error('Chat request failed');
+    addChatMessage((await response.json()).answer, 'assistant');
+    chatMessage.textContent = '';
+  } catch {
+    chatMessage.textContent = 'Nepavyko sukurti pokalbio.';
+    chatMessage.className = 'mt-2 min-h-5 text-sm font-medium text-rose-300';
+  } finally {
+    chatInput.disabled = false;
+    chatInput.focus();
+  }
+});
+
+chatInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    chatForm.requestSubmit();
+  }
 });
 
 let currentDocuments = [];
