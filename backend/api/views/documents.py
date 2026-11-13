@@ -27,6 +27,7 @@ from reportlab.pdfgen import canvas
 
 from api.models import Document
 from api.ai import AIProviderError, get_gemini_provider
+from api.analysis import extract_document_text # arba funkcija, kuri jūsų projekte ištraukia tekstą
 
 
 class DocumentSerializer(Serializer):
@@ -175,15 +176,49 @@ def ask_document_question(request, document_id):
             status=400,
         )
 
+    extracted_text = ""
+    if document.file:
+        filename_lower = document.original_filename.lower()
+        try:
+            document.file.open("rb")
+            if filename_lower.endswith(".pdf"):
+                import pypdf
+                reader = pypdf.PdfReader(document.file)
+                pages = [page.extract_text() or "" for page in reader.pages]
+                extracted_text = "\n".join(pages).strip()
+            elif filename_lower.endswith((".docx", ".doc")):
+                from docx import Document as WordDocument
+                doc = WordDocument(document.file)
+                paragraphs = [p.text for p in doc.paragraphs if p.text]
+                extracted_text = "\n".join(paragraphs).strip()
+        except Exception:
+            extracted_text = ""
+        finally:
+            try:
+                document.file.close()
+            except Exception:
+                pass
+
+    if extracted_text:
+        content_context = extracted_text[:40000]  # Paimame iki 40 tūkst. simbolių
+    else:
+        content_context = (
+            f"Dokumento paaiškinimas: {document.simplified_explanation or 'Nėra.'}\n"
+            f"Pagrindinės sąlygos: {document.key_conditions or 'Nėra.'}"
+        )
+
     prompt = (
-        "Atsakyk lietuviškai į naudotojo klausimą apie pasirinktą dokumentą. "
-        "Remkis tik pateikta dokumento informacija. Jei informacijos nepakanka, "
-        "aiškiai tai pasakyk ir nesugalvok faktų.\n\n"
+        "Tu esi teisinių dokumentų asistentas. Atsakyk lietuviškai į naudotojo klausimą apie pateiktą dokumentą.\n"
+        "Atsakymą formuok TIK remdamasis žemiau pateiktu dokumento turiniu (nebent nurodoma aiškinti savais žodžiais).\n"
+        "Jei pateiktame tekste informacijos apie klausimą tikrai nėra, aiškiai pasakyk: "
+        "'Pateiktame dokumente šios informacijos rasti nepavyko.' ir nesugalvok faktų.\n\n"
         f"Dokumento pavadinimas: {document.original_filename}\n"
-        f"Dokumento paaiškinimas: {document.simplified_explanation or 'Nėra.'}\n"
-        f"Pagrindinės sąlygos: {document.key_conditions or 'Nėra.'}\n\n"
-        f"Naudotojo klausimas: {question}"
+        f"Dokumento turinys:\n\"\"\"\n{content_context}\n\"\"\"\n\n"
+        f"Naudotojo klausimas: {question}\n"
+        "Atsakymas:"
     )
+
+    # --- 3. Siunčiame užklausą į Gemini ---
     try:
         answer = get_gemini_provider().generate(prompt).strip()
     except (AIProviderError, OSError, KeyError, ValueError):
@@ -191,6 +226,7 @@ def ask_document_question(request, document_id):
 
     if not answer:
         return JsonResponse({"message": "Nepavyko sukurti pokalbio."}, status=502)
+
     return JsonResponse({"answer": answer})
 
 
