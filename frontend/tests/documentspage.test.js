@@ -237,7 +237,6 @@ describe('documents page', () => {
     });
   });
 
-<<<<<<< HEAD
   describe('analysis', () => {
     beforeEach(() => {
       URL.createObjectURL = vi.fn(() => 'blob:preview');
@@ -293,7 +292,9 @@ describe('documents page', () => {
       await flush();
       expect($('#analysis-summary').textContent).toBe('Išsaugota santrauka');
       expect($('#analysis-download').classList.contains('hidden')).toBe(false);
-=======
+    });
+  });
+
   describe('comparison', () => {
     const versions = [
       { ...doc, title: 'sutartis', id: 1 },
@@ -328,7 +329,6 @@ describe('documents page', () => {
       expect($('#comparison-report').textContent).toBe('Pridėta nauja sąlyga.');
       expect($('#comparison-download-link').classList.contains('hidden')).toBe(false);
       expect($('#comparison-download-link').download).toBe('sutartis-palyginimas.pdf');
->>>>>>> origin/develop
     });
   });
 
