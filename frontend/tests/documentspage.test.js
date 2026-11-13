@@ -22,7 +22,7 @@ function route(handlers) {
 }
 
 const baseRoutes = (documents = [doc]) => ({
-  'GET /api/documents/': () => json({ documents }),
+  'GET /api/documents/': () => json({ documents: documents.map((document_) => ({ ...document_ })) }),
   'GET /api/auth/csrf/': () => json({}),
 });
 
@@ -57,6 +57,9 @@ describe('documents page', () => {
       await loadPage();
       expect($('#documents-list').textContent).toContain('sutartis.pdf');
       expect($('#documents-status').textContent).toBe('');
+      expect(document.body.textContent).not.toContain(
+        'Analizuojant dokumento tekstas siunčiamas į „Gemini“; nepavykus naudojamas „Ollama“.',
+      );
     });
 
     it('shows an empty state', async () => {
@@ -231,6 +234,64 @@ describe('documents page', () => {
       await open();
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       expect(hidden()).toBe(true);
+    });
+  });
+
+  describe('analysis', () => {
+    beforeEach(() => {
+      URL.createObjectURL = vi.fn(() => 'blob:preview');
+      URL.revokeObjectURL = vi.fn();
+    });
+
+    it('shows progress, then the summary and PDF download', async () => {
+      let finish;
+      const pending = new Promise((resolve) => { finish = resolve; });
+      await loadPage({
+        ...baseRoutes(),
+        'GET /api/documents/1/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+        'POST /api/documents/1/analysis/': (options) => {
+          expect(options.headers['X-CSRFToken']).toBe('token123');
+          return pending;
+        },
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#analyze-button').click();
+      await flush();
+      expect($('#analysis-status').textContent).toBe('Dokumentas analizuojamas...');
+      expect($('#analyze-button').disabled).toBe(true);
+      finish(json({ summary: 'Svarbiausios sąlygos.' }));
+      await flush();
+      expect($('#analysis-summary').textContent).toBe('Svarbiausios sąlygos.');
+      expect($('#analysis-download').getAttribute('href')).toBe('/api/documents/1/summary.pdf');
+      expect($('#analysis-download').classList.contains('hidden')).toBe(false);
+      expect($('#analyze-button').disabled).toBe(false);
+    });
+
+    it('reports analysis failures and allows retrying', async () => {
+      await loadPage({
+        ...baseRoutes(),
+        'GET /api/documents/1/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+        'POST /api/documents/1/analysis/': () => json({}, 502),
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#analyze-button').click();
+      await flush();
+      expect($('#analysis-status').textContent).toBe('Analizė nepavyko, bandykite dar kartą');
+      expect($('#analyze-button').disabled).toBe(false);
+      expect($('#analysis-download').classList.contains('hidden')).toBe(true);
+    });
+
+    it('shows a previously saved summary when reopening a document', async () => {
+      await loadPage({
+        ...baseRoutes([{ ...doc, simplified_explanation: 'Išsaugota santrauka' }]),
+        'GET /api/documents/1/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      expect($('#analysis-summary').textContent).toBe('Išsaugota santrauka');
+      expect($('#analysis-download').classList.contains('hidden')).toBe(false);
     });
   });
 

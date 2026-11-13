@@ -29,6 +29,7 @@ class DocumentSerializer(Serializer):
     file_size = IntegerField()
     content_type = CharField(allow_blank=True)
     analysis_status = CharField()
+    simplified_explanation = CharField(allow_blank=True)
     created_at = CharField()
 
 
@@ -82,6 +83,7 @@ def _serialize_document(document):
         "file_size": document.file_size,
         "content_type": document.content_type,
         "analysis_status": document.analysis_status,
+        "simplified_explanation": document.simplified_explanation,
         "created_at": document.created_at.isoformat(),
     }
 

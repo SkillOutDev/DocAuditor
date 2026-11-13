@@ -9,7 +9,10 @@ Pradinis dokumentų analizės sistemos karkasas:
 
 ## Paleidimas
 
-1. Nukopijuokite `.env.example` į `.env` ir prireikus pakeiskite reikšmes.
+1. Nukopijuokite `backend/.env.example` į `backend/.env` ir įrašykite Gemini
+   API raktą bei savo Ollama modelio pavadinimą. Neįkelkite `.env` į Git.
+   Django automatiškai perskaito šį failą; esami aplinkos kintamieji turi
+   pirmenybę prieš jame nurodytas reikšmes.
 2. Paleiskite duomenų bazę:
 
    ```powershell
@@ -145,8 +148,68 @@ Klausimai apie pasirinktą dokumentą per pokalbio langą visada siunčiami į
 Gemini API. Backend aplinkoje turi būti nustatytas `GEMINI_API_KEY`; pasirenkamas
 `GEMINI_MODEL` numatytai yra `gemini-2.5-flash`.
 
+Gemini ryšiui ir prieinamiems modeliams patikrinti paleiskite backend aplanke:
+
+```powershell
+python manage.py check_gemini
+```
+
+Komanda naudoja `backend/.env`, rodo sukonfigūruotą modelį ir pateikia modelių
+sąrašą. Modelių sąrašas nepatvirtina, kad sukonfigūruotas modelis gali generuoti
+atsakymus. Norėdami patikrinti ir generavimą, vykdykite
+`python manage.py check_gemini --generate`: Gemini bus nusiųsta trumpa
+bandomoji užklausa, bet ne dokumento turinys. Galioja įprasti API naudojimo
+apribojimai ir galimi mokesčiai.
+
 Ollama atveju atskirai įdiekite Ollama ir atsisiųskite pasirinktą modelį, pavyzdžiui:
 
 ```powershell
 ollama pull llama3.2
 ```
+
+## Bendroji dokumento analizė (US-9)
+
+Prisijungę atidarykite savo dokumentą ir pasirinkite „Analizuoti“. Dokumento
+tekstas pirmiausia siunčiamas į „Gemini“ (Google); jei užklausa nepavyksta arba
+grąžina tuščią ar ilgesnę nei 700 simbolių santrauką, naudojamas vietinis
+„Ollama“. Santrauka išsaugoma kartu su dokumento metaduomenimis. Mygtukas
+„Gauti santrauką“ atsisiunčia ją PDF formatu.
+
+„Ollama“ santraukos riba yra 2000 simbolių, todėl jos gali viršyti pradiniame
+US-9 reikalavime numatytą 700 simbolių ribą. „Gemini“ riba išlieka 700.
+Jeigu „Ollama“ atsakymas viršija 2000 simbolių, vieną kartą pakartotinai
+paprašoma dar trumpesnės santraukos. Jei ir ji per ilga, analizė atmetama,
+o ne nukerpama sakinio viduryje.
+
+`backend/.env` nustatykite `GEMINI_API_KEY`, o `OLLAMA_MODEL` turi atitikti
+`ollama list` rodomą įdiegtą modelį. Pakeitę failą, paleiskite Django iš naujo.
+Jei tas pats kintamasis jau nustatytas terminale, naudojama terminalo reikšmė.
+Atsarginiam variantui „Ollama“ turi veikti ir turėti atsisiųstą modelį.
+Gemini užklausos timeout yra 60 s, Ollama — 120 s.
+
+Analizės klaidos diagnostika rodoma backend terminale: nurodomas tiekėjas,
+HTTP būsenos kodas arba tai, kad santrauka tuščia ar viršija tiekėjo ribą.
+Dokumento tekstas, API raktas ir teikėjų klaidų turinys į šiuos pranešimus
+neįtraukiami. Jei abu tiekėjai nepavyksta, API grąžina 502.
+
+Docker Compose automatiškai neskaito `backend/.env`. Keičiant `POSTGRES_*`
+reikšmes Django aplinkoje, būtina atitinkamai sukonfigūruoti ir Compose bei
+esamą PostgreSQL duomenų bazę.
+
+PDF ir DOCX tekstas išskiriamas Python bibliotekomis. Senų DOC failų tekstui
+reikia įdiegti LibreOffice ir įtraukti `soffice` į PATH arba nurodyti jo kelią
+backend aplinkoje, pavyzdžiui:
+
+```powershell
+$env:LIBREOFFICE_PATH = "C:\Program Files\LibreOffice\program\soffice.exe"
+```
+
+Skaitmeninto vaizdo PDF be teksto, užšifruoti, sugadinti, tušti ir ilgesnį nei
+100 000 simbolių tekstą turintys dokumentai neanalizuojami; OCR nevykdomas.
+PDF santraukai naudojamas sistemos Unicode šriftas (Windows Arial arba Linux
+DejaVu Sans); jei jo nėra, nustatykite `SUMMARY_PDF_FONT` į TTF failo kelią.
+Analizė yra DI sugeneruota ir nėra garantuotai teisingas teisinis vertinimas.
+
+API: `POST /api/documents/<id>/analysis/` grąžina `{"summary": "..."}`, o
+`GET /api/documents/<id>/summary.pdf` grąžina PDF. Abu prieinami tik dokumento
+savininkui; POST užklausai būtina sesija ir CSRF žetonas.

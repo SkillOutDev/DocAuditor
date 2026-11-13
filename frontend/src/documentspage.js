@@ -50,6 +50,9 @@ document.querySelector('#app').innerHTML = `
             <button id="preview-delete-button" type="button" class="rounded-xl border border-rose-400/70 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300">
               Ištrinti
             </button>
+            <button id="analyze-button" type="button" class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 disabled:opacity-50">
+              Analizuoti
+            </button>
             <button id="ask-document-button" type="button" class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">
               Paklausk apie dokumentą
             </button>
@@ -82,6 +85,11 @@ document.querySelector('#app').innerHTML = `
             </section>
           </div>
         </header>
+        <div class="max-h-52 overflow-y-auto border-b border-charcoal-blue-700/80 px-5 py-3 text-sm text-powder-blue-300">
+          <p id="analysis-status" class="mt-2" aria-live="polite"></p>
+          <p id="analysis-summary" class="mt-2 whitespace-pre-wrap text-alabaster-grey-50"></p>
+          <a id="analysis-download" class="mt-2 hidden font-semibold text-pacific-blue-300" download>Gauti santrauką</a>
+        </div>
         <p id="preview-status" class="hidden px-5 py-4 text-sm text-powder-blue-400" aria-live="polite"></p>
         <iframe id="preview-frame" title="Dokumento turinio peržiūra" class="hidden min-h-0 flex-1 bg-white"></iframe>
         <div id="preview-download" class="hidden px-5 pb-5 text-sm text-powder-blue-400">
@@ -145,6 +153,11 @@ const previewFrame = document.querySelector('#preview-frame');
 const previewDownload = document.querySelector('#preview-download');
 const previewDownloadLink = document.querySelector('#preview-download-link');
 const previewDeleteButton = document.querySelector('#preview-delete-button');
+const analyzeButton = document.querySelector('#analyze-button');
+const analysisStatus = document.querySelector('#analysis-status');
+const analysisSummary = document.querySelector('#analysis-summary');
+const analysisDownload = document.querySelector('#analysis-download');
+const analyzingDocuments = new Set();
 const askDocumentButton = document.querySelector('#ask-document-button');
 const compareDocumentsButton = document.querySelector('#compare-documents-button');
 const chatDialog = document.querySelector('#chat-dialog');
@@ -237,6 +250,7 @@ function closeComparison() {
 
 async function openDocumentPreview(document_) {
   previewDocument = document_;
+  renderAnalysis(document_);
   previewDialog.classList.remove('hidden');
   previewTitle.textContent = document_.original_filename;
   previewDate.textContent = `· Įkelta ${new Date(document_.created_at).toLocaleDateString('lt-LT')}`;
@@ -274,6 +288,46 @@ async function openDocumentPreview(document_) {
     previewStatus.classList.remove('hidden');
   }
 }
+
+function renderAnalysis(document_) {
+  const analyzing = analyzingDocuments.has(document_.id);
+  analyzeButton.disabled = analyzing;
+  analysisStatus.textContent = analyzing ? 'Dokumentas analizuojamas...' : '';
+  analysisSummary.textContent = document_.simplified_explanation || '';
+  analysisDownload.classList.toggle('hidden', !document_.simplified_explanation);
+  analysisDownload.href = `/api/documents/${document_.id}/summary.pdf`;
+}
+
+analyzeButton.addEventListener('click', async () => {
+  const document_ = previewDocument;
+  if (!document_ || analyzingDocuments.has(document_.id)) return;
+  analyzingDocuments.add(document_.id);
+  renderAnalysis(document_);
+  try {
+    const response = await fetch(`/api/documents/${document_.id}/analysis/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': await getCsrfToken() },
+      credentials: 'same-origin',
+    });
+    if (response.status === 401) {
+      window.location.replace('/login');
+      return;
+    }
+    if (!response.ok) throw new Error('Analysis request failed');
+    const result = await response.json();
+    document_.simplified_explanation = result.summary;
+    if (previewDocument?.id === document_.id) analysisSummary.textContent = result.summary;
+  } catch {
+    if (previewDocument?.id === document_.id) analysisStatus.textContent = 'Analizė nepavyko, bandykite dar kartą';
+  } finally {
+    analyzingDocuments.delete(document_.id);
+    if (previewDocument?.id === document_.id) {
+      analyzeButton.disabled = false;
+      if (analysisStatus.textContent === 'Dokumentas analizuojamas...') analysisStatus.textContent = '';
+      analysisDownload.classList.toggle('hidden', !document_.simplified_explanation);
+    }
+  }
+});
 
 function renderDocuments(documents) {
   currentDocuments = documents;
