@@ -210,6 +210,7 @@ def ask_document_question(request, document_id):
     prompt = (
         "Tu esi teisinių dokumentų asistentas. Atsakyk lietuviškai į naudotojo klausimą apie pateiktą dokumentą.\n"
         "Atsakymą formuok TIK remdamasis žemiau pateiktu dokumento turiniu (nebent nurodoma aiškinti savais žodžiais).\n"
+        "Būk itin atidus datoms, skaičiams, terminams, kainoms ir sutarties punktams (parašyk kuriame punkte/punktuose tai minima jei įmanoma).\n"
         "Jei pateiktame tekste informacijos apie klausimą tikrai nėra, aiškiai pasakyk: "
         "'Pateiktame dokumente šios informacijos rasti nepavyko.' ir nesugalvok faktų.\n\n"
         f"Dokumento pavadinimas: {document.original_filename}\n"
