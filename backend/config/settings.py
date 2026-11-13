@@ -4,6 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR.parent / ".env")
 
 load_dotenv(BASE_DIR / ".env")
 
@@ -63,7 +64,11 @@ DATABASES = {
         "PASSWORD": os.getenv("POSTGRES_PASSWORD", "change-me"),
         "HOST": os.getenv("POSTGRES_HOST", "localhost"),
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
+<<<<<<< HEAD
     }
+=======
+    },
+>>>>>>> origin/develop
 }
 
 LANGUAGE_CODE = "lt"

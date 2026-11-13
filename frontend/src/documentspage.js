@@ -114,6 +114,7 @@ document.querySelector('#app').innerHTML = `
         <p id="comparison-message" class="mt-4 min-h-5 text-sm font-medium" aria-live="polite"></p>
         <button id="run-comparison-button" type="button" class="mt-2 rounded-xl bg-pacific-blue-500 px-5 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 disabled:cursor-not-allowed disabled:opacity-50">Palyginti</button>
         <div id="comparison-report" class="mt-5 hidden max-h-96 overflow-y-auto rounded-xl border border-charcoal-blue-700 bg-charcoal-blue-900/50 p-4 text-sm leading-6 text-powder-blue-200 whitespace-pre-wrap"></div>
+        <div id="comparison-download-container" class="mt-4"></div>
       </section>
     </div>
     <div id="delete-dialog" class="fixed inset-0 z-20 hidden items-center justify-center bg-carbon-black-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-message">
@@ -175,6 +176,7 @@ const secondVersionSelect = document.querySelector('#second-version-select');
 const comparisonMessage = document.querySelector('#comparison-message');
 const runComparisonButton = document.querySelector('#run-comparison-button');
 const comparisonReport = document.querySelector('#comparison-report');
+const comparisonDownloadContainer = document.querySelector('#comparison-download-container');
 const deleteDialog = document.querySelector('#delete-dialog');
 const cancelDeleteButton = document.querySelector('#cancel-delete-button');
 const confirmDeleteButton = document.querySelector('#confirm-delete-button');
@@ -182,6 +184,7 @@ let previewObjectUrl = '';
 let previewDocument = null;
 let pendingDeleteDocument = null;
 let chatDocument = null;
+let comparisonObjectUrl = '';
 const DELETE_SUCCESS = 'Dokumentas sėkmingai ištrintas';
 const DELETE_FAILED = 'Klaida: nepavyko ištrinti dokumento';
 
@@ -239,6 +242,11 @@ function openComparison() {
   comparisonMessage.textContent = versions.length < 2 ? 'Nepasirinkti dokumentai palyginimui' : '';
   comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-300';
   comparisonReport.classList.add('hidden');
+  comparisonDownloadContainer.replaceChildren();
+  if (comparisonObjectUrl) {
+    URL.revokeObjectURL(comparisonObjectUrl);
+    comparisonObjectUrl = '';
+  }
   comparisonDialog.classList.remove('hidden');
   comparisonDialog.classList.add('flex');
 }
@@ -246,6 +254,10 @@ function openComparison() {
 function closeComparison() {
   comparisonDialog.classList.add('hidden');
   comparisonDialog.classList.remove('flex');
+  if (comparisonObjectUrl) {
+    URL.revokeObjectURL(comparisonObjectUrl);
+    comparisonObjectUrl = '';
+  }
 }
 
 async function openDocumentPreview(document_) {
@@ -446,9 +458,10 @@ runComparisonButton.addEventListener('click', async () => {
     return;
   }
   runComparisonButton.disabled = true;
-  comparisonMessage.textContent = 'Lyginamos dokumentų versijos';
+  comparisonMessage.textContent = 'Lyginama';
   comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-powder-blue-400';
   comparisonReport.classList.add('hidden');
+  comparisonDownloadContainer.replaceChildren();
   try {
     const response = await fetch('/api/documents/compare/', {
       method: 'POST',
@@ -467,8 +480,18 @@ runComparisonButton.addEventListener('click', async () => {
       return;
     }
     if (!response.ok) throw new Error('Comparison request failed');
-    comparisonReport.textContent = (await response.json()).report;
+    const result = await response.json();
+    comparisonReport.textContent = result.report;
     comparisonReport.classList.remove('hidden');
+    const pdfBytes = Uint8Array.from(atob(result.pdf_base64), (character) => character.charCodeAt(0));
+    comparisonObjectUrl = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }));
+    const comparisonDownloadLink = document.createElement('a');
+    comparisonDownloadLink.id = 'comparison-download-link';
+    comparisonDownloadLink.className = 'inline-block rounded-xl border border-pacific-blue-400 px-4 py-2 text-sm font-semibold text-pacific-blue-300 hover:bg-pacific-blue-400/10';
+    comparisonDownloadLink.textContent = 'Atsisiųsti ataskaitą';
+    comparisonDownloadLink.href = comparisonObjectUrl;
+    comparisonDownloadLink.download = result.pdf_filename;
+    comparisonDownloadContainer.append(comparisonDownloadLink);
     comparisonMessage.textContent = '';
   } catch {
     comparisonMessage.textContent = 'Dokumentų palyginti nepavyko';
