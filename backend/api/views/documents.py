@@ -1,4 +1,7 @@
 import json
+import base64
+import io
+import os
 from pathlib import Path
 from mimetypes import guess_type
 
@@ -17,6 +20,10 @@ from rest_framework.serializers import (
     Serializer,
 )
 from rest_framework.views import APIView
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
 from api.models import Document
 from api.ai import AIProviderError, get_gemini_provider
@@ -68,6 +75,8 @@ class DocumentComparisonRequestSerializer(Serializer):
 
 class DocumentComparisonResponseSerializer(Serializer):
     report = CharField()
+    pdf_base64 = CharField()
+    pdf_filename = CharField()
 
 
 class ManualDocumentAuthenticationPermission(AllowAny):
@@ -257,7 +266,74 @@ def compare_document_versions(request):
             {"message": "Dokumentų palyginti nepavyko"},
             status=502,
         )
-    return JsonResponse({"report": report})
+    try:
+        pdf_content = _build_comparison_pdf(report, first, second)
+    except (OSError, ValueError):
+        return JsonResponse(
+            {"message": "Dokumentų palyginti nepavyko"},
+            status=502,
+        )
+    return JsonResponse(
+        {
+            "report": report,
+            "pdf_base64": base64.b64encode(pdf_content).decode("ascii"),
+            "pdf_filename": f"{Path(first.original_filename).stem}-palyginimas.pdf",
+        }
+    )
+
+
+def _register_pdf_font():
+    font_name = "DocAuditorPdfFont"
+    if font_name in pdfmetrics.getRegisteredFontNames():
+        return font_name
+
+    candidates = [
+        os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "arial.ttf"),
+        r"C:\Windows\Fonts\arial.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            pdfmetrics.registerFont(TTFont(font_name, path))
+            return font_name
+    return "Helvetica"
+
+
+def _build_comparison_pdf(report, first, second):
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    font_name = _register_pdf_font()
+    pdf.setTitle(f"{first.title} - dokumento versijų palyginimas")
+    pdf.setFont(font_name, 16)
+    pdf.drawString(48, height - 52, "Dokumento versijų palyginimas")
+    pdf.setFont(font_name, 10)
+    pdf.drawString(48, height - 72, f"Dokumentas: {first.title}")
+    pdf.drawString(48, height - 88, f"Versijos: {first.original_filename} ir {second.original_filename}")
+
+    text = pdf.beginText(48, height - 120)
+    text.setFont(font_name, 10)
+    text.setLeading(14)
+    for paragraph in report.splitlines() or [""]:
+        words = paragraph.split()
+        line = ""
+        for word in words:
+            candidate = f"{line} {word}".strip()
+            if pdf.stringWidth(candidate, font_name, 10) > width - 96 and line:
+                text.textLine(line)
+                line = word
+            else:
+                line = candidate
+        text.textLine(line)
+        if text.getY() < 48:
+            pdf.drawText(text)
+            pdf.showPage()
+            pdf.setFont(font_name, 10)
+            text = pdf.beginText(48, height - 48)
+            text.setLeading(14)
+    pdf.drawText(text)
+    pdf.save()
+    return buffer.getvalue()
 
 
 class DocumentCollectionView(APIView):

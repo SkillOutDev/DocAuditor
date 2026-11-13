@@ -44,6 +44,10 @@ Paleidus backend, interaktyvi Swagger UI dokumentacija pasiekiama adresu
 `http://localhost:8000/api/schema/`. Dokumentacija apima sveikatos patikrą,
 registraciją ir dokumentų sąrašo bei įkėlimo API.
 
+Atidarius dokumentą galima pasirinkti dvi to paties dokumento versijas ir jas
+palyginti. DI ataskaita parodoma lange, o sėkmingo palyginimo atveju ją galima
+atsisiųsti PDF formatu.
+
 ## Dokumentų saugojimo API
 
 Dokumentų API naudoja prisijungusio Django naudotojo sesiją. Įkėlimas priima

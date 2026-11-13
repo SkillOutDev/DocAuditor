@@ -234,6 +234,43 @@ describe('documents page', () => {
     });
   });
 
+  describe('comparison', () => {
+    const versions = [
+      { ...doc, title: 'sutartis', id: 1 },
+      { id: 2, title: 'sutartis', original_filename: 'sutartis-v2.pdf', created_at: '2026-01-03T10:00:00Z' },
+    ];
+
+    it('shows the report and PDF download after a successful comparison', async () => {
+      URL.createObjectURL = vi.fn(() => 'blob:comparison');
+      URL.revokeObjectURL = vi.fn();
+      await loadPage({
+        ...baseRoutes(versions),
+        'GET /api/documents/1/preview/': () => ({
+          ok: true,
+          status: 200,
+          blob: async () => new Blob(['x'], { type: 'application/pdf' }),
+        }),
+        'POST /api/documents/compare/': () => json({
+          report: 'Pridėta nauja sąlyga.',
+          pdf_base64: btoa('pdf'),
+          pdf_filename: 'sutartis-palyginimas.pdf',
+        }),
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#compare-documents-button').click();
+      expect($('#comparison-download-link')).toBeNull();
+      $('#first-version-select').value = '1';
+      $('#second-version-select').value = '2';
+      $('#run-comparison-button').click();
+      await flush();
+
+      expect($('#comparison-report').textContent).toBe('Pridėta nauja sąlyga.');
+      expect($('#comparison-download-link').classList.contains('hidden')).toBe(false);
+      expect($('#comparison-download-link').download).toBe('sutartis-palyginimas.pdf');
+    });
+  });
+
   describe('delete', () => {
     const deleteRoutes = (status) => ({
       ...baseRoutes(),
