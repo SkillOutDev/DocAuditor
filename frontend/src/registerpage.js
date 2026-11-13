@@ -11,6 +11,13 @@ document.querySelector('#app').innerHTML = `
       </div>
 
       <form id="register-form" novalidate class="rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-7 shadow-2xl shadow-black/20 sm:p-8">
+        <section id="privacy-notice" class="mb-6 rounded-xl border border-pacific-blue-400/40 bg-pacific-blue-950/40 p-4 text-sm leading-6 text-powder-blue-200" aria-labelledby="privacy-notice-title">
+          <h2 id="privacy-notice-title" class="font-semibold text-alabaster-grey-50">Privatumo informacija</h2>
+          <p class="mt-2">Prieš registruodamiesi peržiūrėkite, kaip tvarkomi jūsų duomenys.</p>
+          <button id="privacy-open-button" type="button" class="mt-2 font-semibold text-pacific-blue-300 underline decoration-pacific-blue-300/60 underline-offset-4 hover:text-pacific-blue-200 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">
+            Terms and conditions
+          </button>
+        </section>
         <div class="space-y-5">
           <div>
             <label for="username" class="mb-2 block text-sm font-medium text-powder-blue-200">Vartotojo vardas</label>
@@ -43,6 +50,35 @@ document.querySelector('#app').innerHTML = `
         </p>
       </form>
     </section>
+    <div id="privacy-dialog" class="fixed inset-0 z-30 hidden items-center justify-center bg-carbon-black-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="privacy-dialog-title">
+      <section class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 p-6 shadow-2xl">
+        <header class="flex items-center justify-between gap-4">
+          <h2 id="privacy-dialog-title" class="text-lg font-semibold text-alabaster-grey-50">Terms and conditions</h2>
+          <button id="privacy-close-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">
+            Uždaryti
+          </button>
+        </header>
+        <div class="mt-5 space-y-4 text-sm leading-6 text-powder-blue-200">
+          <p>Prieš pateikdami registracijos duomenis susipažinkite su tuo, kaip sistema juos tvarko.</p>
+          <div>
+            <h3 class="font-semibold text-alabaster-grey-100">Kokius duomenis renkame?</h3>
+            <p>Renkame vartotojo vardą, el. pašto adresą ir paskyros slaptažodį. Slaptažodis saugomas tik užšifruotu (maišos) pavidalu.</p>
+          </div>
+          <div>
+            <h3 class="font-semibold text-alabaster-grey-100">Kaip naudojame duomenis?</h3>
+            <p>Duomenys naudojami paskyrai sukurti, prisijungimui, dokumentų analizei ir sistemos veikimui užtikrinti.</p>
+          </div>
+          <div>
+            <h3 class="font-semibold text-alabaster-grey-100">Kiek laiko saugome duomenis?</h3>
+            <p>Paskyros duomenys saugomi, kol paskyra ištrinama arba kol jų saugojimas reikalingas sistemos veikimui ir saugumui.</p>
+          </div>
+          <div>
+            <h3 class="font-semibold text-alabaster-grey-100">Kas gali pasiekti duomenis?</h3>
+            <p>Duomenis gali pasiekti tik sistemos administratoriai ir paslaugų teikėjai, būtini sistemos veikimui. Jie gali būti perduodami DI paslaugos teikėjui tik dokumentų analizės ir klausimų atsakymo funkcijoms vykdyti.</p>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
 `;
 
@@ -51,6 +87,9 @@ initializeThemeToggle();
 const form = document.querySelector('#register-form');
 const message = document.querySelector('#register-message');
 const submitButton = form.querySelector('button[type="submit"]');
+const privacyDialog = document.querySelector('#privacy-dialog');
+const privacyOpenButton = document.querySelector('#privacy-open-button');
+const privacyCloseButton = document.querySelector('#privacy-close-button');
 const fieldNames = ['username', 'email', 'password'];
 
 function clearFieldError(name) {
@@ -70,6 +109,27 @@ function showFieldError(name, text) {
   error.textContent = text;
   error.classList.remove('hidden');
 }
+
+function openPrivacyDialog() {
+  privacyDialog.classList.remove('hidden');
+  privacyDialog.classList.add('flex');
+  privacyCloseButton.focus();
+}
+
+function closePrivacyDialog() {
+  privacyDialog.classList.add('hidden');
+  privacyDialog.classList.remove('flex');
+  privacyOpenButton.focus();
+}
+
+privacyOpenButton.addEventListener('click', openPrivacyDialog);
+privacyCloseButton.addEventListener('click', closePrivacyDialog);
+privacyDialog.addEventListener('click', (event) => {
+  if (event.target === privacyDialog) closePrivacyDialog();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !privacyDialog.classList.contains('hidden')) closePrivacyDialog();
+});
 
 for (const name of fieldNames) {
   form.elements.namedItem(name).addEventListener('input', () => clearFieldError(name));

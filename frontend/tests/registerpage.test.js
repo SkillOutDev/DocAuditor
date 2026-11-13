@@ -39,6 +39,26 @@ describe('register page', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('shows privacy information before the registration fields', async () => {
+    await loadPage();
+
+    expect($('#privacy-notice')).not.toBeNull();
+    expect($('#privacy-open-button').textContent).toContain('Terms and conditions');
+    expect($('#privacy-notice').compareDocumentPosition($('#username')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('opens and closes the terms overlay', async () => {
+    await loadPage();
+
+    $('#privacy-open-button').click();
+    expect($('#privacy-dialog').classList.contains('hidden')).toBe(false);
+    expect($('#privacy-dialog').textContent).toContain('el. pašto adresą');
+    expect($('#privacy-dialog').textContent).toContain('DI paslaugos teikėjui');
+
+    $('#privacy-close-button').click();
+    expect($('#privacy-dialog').classList.contains('hidden')).toBe(true);
+  });
+
   it('validates username length, email format and password length', async () => {
     await loadPage();
     fill({ username: 'x'.repeat(151), email: 'not-an-email', password: 'p'.repeat(129) });
