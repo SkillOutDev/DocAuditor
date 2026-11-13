@@ -1,6 +1,7 @@
 import json
 import sys
 import tempfile
+from base64 import b64decode
 from types import SimpleNamespace
 from unittest import mock
 
@@ -236,3 +237,56 @@ class AIProviderTests(TestCase):
             self.assertEqual(provider.generate("hi"), "gemini")
             client.models.generate_content.return_value = SimpleNamespace(text=None)
             self.assertEqual(provider.generate("hi"), "")
+
+
+class DocumentComparisonTests(TestCase):
+    def setUp(self):
+        self.media_directory = tempfile.TemporaryDirectory()
+        self.media_settings = override_settings(MEDIA_ROOT=self.media_directory.name)
+        self.media_settings.enable()
+        self.addCleanup(self.media_directory.cleanup)
+        self.addCleanup(self.media_settings.disable)
+        self.user = get_user_model().objects.create_user(
+            username="comparison-owner",
+            password="secure-password",
+        )
+        self.first = Document.objects.create(
+            owner=self.user,
+            title="Sutartis",
+            file=SimpleUploadedFile("sutartis-v1.pdf", b"v1"),
+            original_filename="sutartis-v1.pdf",
+            file_size=2,
+            simplified_explanation="Pirma versija",
+            key_conditions=["Sena sąlyga"],
+        )
+        self.second = Document.objects.create(
+            owner=self.user,
+            title="Sutartis",
+            file=SimpleUploadedFile("sutartis-v2.pdf", b"v2"),
+            original_filename="sutartis-v2.pdf",
+            file_size=2,
+            simplified_explanation="Antra versija",
+            key_conditions=["Nauja sąlyga"],
+        )
+        self.client.force_login(self.user)
+
+    @mock.patch("api.views.documents.get_gemini_provider")
+    def test_comparison_returns_report_and_pdf(self, get_provider):
+        get_provider.return_value.generate.return_value = "Pridėta nauja sąlyga."
+
+        response = self.client.post(
+            reverse("document-compare"),
+            data=json.dumps(
+                {
+                    "first_document_id": self.first.pk,
+                    "second_document_id": self.second.pk,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["report"], "Pridėta nauja sąlyga.")
+        self.assertEqual(payload["pdf_filename"], "sutartis-v1-palyginimas.pdf")
+        self.assertTrue(b64decode(payload["pdf_base64"]).startswith(b"%PDF"))
