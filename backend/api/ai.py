@@ -12,11 +12,18 @@ class AIProviderError(Exception):
     """Raised when an AI provider cannot answer a request."""
 
 
+class MissingGeminiAPIKey(AIProviderError):
+    """Raised when the Gemini API key is not configured."""
+
+
 class GeminiProvider:
     def __init__(self):
         from google import genai
 
-        self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        if not api_key:
+            raise MissingGeminiAPIKey()
+        self.client = genai.Client(api_key=api_key, http_options={"timeout": 60000})
         self.model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     def generate(self, prompt: str) -> str:
