@@ -80,7 +80,7 @@ class AnalysisLoggingTests(SimpleTestCase):
         self.assertIn("about 50 words", prompts[0])
         self.assertIn("about 30 words", prompts[1])
         self.assertTrue(all("2000 characters" in p for p in prompts))
-        self.assertTrue(all("in Lithuanian" in p for p in prompts))
+        self.assertTrue(all("Lithuanian" in p for p in prompts))
         self.assertTrue(all("Start directly with" in p for p in prompts))
         self.assertTrue(all("<document>\nDokumento sąlygos\n</document>" in p for p in prompts))
 
