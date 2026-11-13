@@ -297,13 +297,11 @@ describe('documents page', () => {
 
   describe('comparison', () => {
     const versions = [
-      { ...doc, title: 'sutartis', id: 1 },
+      { ...doc, title: 'sutartis' },
       { id: 2, title: 'sutartis', original_filename: 'sutartis-v2.pdf', created_at: '2026-01-03T10:00:00Z' },
     ];
 
-    it('shows the report and PDF download after a successful comparison', async () => {
-      URL.createObjectURL = vi.fn(() => 'blob:comparison');
-      URL.revokeObjectURL = vi.fn();
+    async function openComparison(response) {
       await loadPage({
         ...baseRoutes(versions),
         'GET /api/documents/1/preview/': () => ({
@@ -311,24 +309,39 @@ describe('documents page', () => {
           status: 200,
           blob: async () => new Blob(['x'], { type: 'application/pdf' }),
         }),
-        'POST /api/documents/compare/': () => json({
-          report: 'Pridėta nauja sąlyga.',
-          pdf_base64: btoa('pdf'),
-          pdf_filename: 'sutartis-palyginimas.pdf',
-        }),
+        'POST /api/documents/compare/': () => json(response),
       });
       $('[data-document-id="1"]').click();
       await flush();
       $('#compare-documents-button').click();
-      expect($('#comparison-download-link')).toBeNull();
       $('#first-version-select').value = '1';
       $('#second-version-select').value = '2';
       $('#run-comparison-button').click();
       await flush();
+    }
 
-      expect($('#comparison-report').textContent).toBe('Pridėta nauja sąlyga.');
+    it('shows the report and PDF download after a successful comparison', async () => {
+      await openComparison({
+        report: 'PRIDĖTA\n1. Nauja sąlyga\nPAŠALINTA\n1. Sena sąlyga\nPAKEISTA\n1. Pakeista sąlyga',
+        pdf_base64: btoa('pdf'),
+        pdf_filename: 'sutartis-palyginimas.pdf',
+        has_differences: true,
+      });
+
+      expect($('#comparison-report').textContent).toContain('PRIDĖTA');
       expect($('#comparison-download-link').classList.contains('hidden')).toBe(false);
       expect($('#comparison-download-link').download).toBe('sutartis-palyginimas.pdf');
+      expect($('#comparison-message').textContent).toBe('');
+      expect($('[data-difference-type="added"]').className).toContain('text-emerald-300');
+      expect($('[data-difference-type="removed"]').className).toContain('text-rose-300');
+      expect($('[data-difference-type="changed"]').className).toContain('text-yellow-300');
+    });
+
+    it('informs the client when no differences were found', async () => {
+      await openComparison({ report: 'SKIRTUMŲ NĖRA', has_differences: false });
+
+      expect($('#comparison-report').classList.contains('hidden')).toBe(true);
+      expect($('#comparison-message').textContent).toBe('Skirtumų nenustatyta.');
     });
   });
 

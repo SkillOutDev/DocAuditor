@@ -13,6 +13,7 @@ from django.urls import reverse
 
 from api import ai
 from api.models import Document
+from api.rag import retrieve_relevant_chunks
 
 
 class RegistrationValidationTests(TestCase):
@@ -272,7 +273,11 @@ class DocumentComparisonTests(TestCase):
 
     @mock.patch("api.views.documents.get_gemini_provider")
     def test_comparison_returns_report_and_pdf(self, get_provider):
-        get_provider.return_value.generate.return_value = "Pridėta nauja sąlyga."
+        get_provider.return_value.generate.return_value = (
+            "PRIDĖTA\n1. Nauja sąlyga\n"
+            "PAŠALINTA\n1. Sena sąlyga\n"
+            "PAKEISTA\n1. Nėra."
+        )
 
         response = self.client.post(
             reverse("document-compare"),
@@ -287,6 +292,46 @@ class DocumentComparisonTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["report"], "Pridėta nauja sąlyga.")
+        self.assertTrue(payload["has_differences"])
+        self.assertIn("PRIDĖTA", payload["report"])
         self.assertEqual(payload["pdf_filename"], "sutartis-v1-palyginimas.pdf")
         self.assertTrue(b64decode(payload["pdf_base64"]).startswith(b"%PDF"))
+        prompt = get_provider.return_value.generate.call_args.args[0]
+        self.assertIn("SKIRTUMŲ NĖRA", prompt)
+        self.assertIn("sunumeruotu sąrašu", prompt)
+        self.assertIn("'1. ...', '2. ...'", prompt)
+        self.assertIn("nenaudok brūkšnelių", prompt)
+        self.assertIn("nekartok dokumento pavadinimo", prompt)
+        self.assertIn("sutartis-v1.pdf", prompt)
+        self.assertIn("sutartis-v2.pdf", prompt)
+
+    @mock.patch("api.views.documents.get_gemini_provider")
+    def test_comparison_reports_no_differences(self, get_provider):
+        get_provider.return_value.generate.return_value = "SKIRTUMŲ NĖRA"
+
+        response = self.client.post(
+            reverse("document-compare"),
+            data=json.dumps(
+                {
+                    "first_document_id": self.first.pk,
+                    "second_document_id": self.second.pk,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["has_differences"])
+
+
+class DocumentRetrievalTests(TestCase):
+    def test_retrieval_prioritizes_chunks_matching_the_question(self):
+        chunks = [
+            "Šalys susitaria dėl sutarties nutraukimo įspėjimo termino.",
+            "Mokėjimai atliekami kiekvieno mėnesio pirmą dieną.",
+            "Dokumentas pasirašomas elektroniniu parašu.",
+        ]
+
+        relevant = retrieve_relevant_chunks(chunks, "Koks sutarties nutraukimo terminas?", limit=1)
+
+        self.assertEqual(relevant, [chunks[0]])

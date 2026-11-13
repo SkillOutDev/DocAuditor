@@ -12,6 +12,7 @@ from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.serializers import (
+    BooleanField,
     CharField,
     DictField,
     FileField,
@@ -28,6 +29,7 @@ from reportlab.pdfgen import canvas
 from api.models import Document
 from api.ai import AIProviderError, get_gemini_provider
 from api.analysis import extract_document_text # arba funkcija, kuri jūsų projekte ištraukia tekstą
+from api.rag import DocumentRetrievalError, document_context
 
 
 class DocumentSerializer(Serializer):
@@ -79,6 +81,7 @@ class DocumentComparisonResponseSerializer(Serializer):
     report = CharField()
     pdf_base64 = CharField()
     pdf_filename = CharField()
+    has_differences = BooleanField()
 
 
 class ManualDocumentAuthenticationPermission(AllowAny):
@@ -282,19 +285,22 @@ def compare_document_versions(request):
     second = next(document for document in documents if document.id == second_id)
     prompt = (
         "Atsakyk lietuviškai ir palygink dvi to paties dokumento versijas. "
-        "Pateik aiškią ataskaitą punktais: kas pridėta, pašalinta arba pakeista. "
-        "Jei pateiktos informacijos nepakanka, tai aiškiai nurodyk.\n\n"
+        "Naudok tik pateiktą informaciją ir pateik ataskaitą tiksliai trimis "
+        "atskiromis antraštėmis: PRIDĖTA, PAŠALINTA, PAKEISTA. "
+        "Kiekvienos antraštės skirtumus pateik sunumeruotu sąrašu, naudojant "
+        "formatą '1. ...', '2. ...'; nenaudok brūkšnelių ar kitų sąrašo žymenų. "
+        "Versijų pavadinimai jau pateikti žemiau, todėl nekartok dokumento "
+        "pavadinimo prie kiekvieno punkto. Jei skirtumų nėra, atsakyk tiksliai "
+        "'SKIRTUMŲ NĖRA'. Jei informacijos nepakanka, aiškiai tai nurodyk.\n\n"
         f"Dokumentas: {first.title}\n"
         f"Pirma versija ({first.original_filename}, {first.created_at.isoformat()}):\n"
-        f"Paaiškinimas: {first.simplified_explanation or 'Nėra.'}\n"
-        f"Sąlygos: {first.key_conditions or 'Nėra.'}\n\n"
+        f"Atitinkami pirmos versijos fragmentai:\n{document_context(first, limit=12)}\n\n"
         f"Antra versija ({second.original_filename}, {second.created_at.isoformat()}):\n"
-        f"Paaiškinimas: {second.simplified_explanation or 'Nėra.'}\n"
-        f"Sąlygos: {second.key_conditions or 'Nėra.'}"
+        f"Atitinkami antros versijos fragmentai:\n{document_context(second, limit=12)}"
     )
     try:
         report = get_gemini_provider().generate(prompt).strip()
-    except (AIProviderError, OSError, KeyError, ValueError):
+    except (AIProviderError, DocumentRetrievalError, OSError, KeyError, ValueError):
         return JsonResponse(
             {"message": "Dokumentų palyginti nepavyko"},
             status=502,
@@ -317,6 +323,7 @@ def compare_document_versions(request):
             "report": report,
             "pdf_base64": base64.b64encode(pdf_content).decode("ascii"),
             "pdf_filename": f"{Path(first.original_filename).stem}-palyginimas.pdf",
+            "has_differences": report.strip().upper() != "SKIRTUMŲ NĖRA",
         }
     )
 
