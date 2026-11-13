@@ -12,6 +12,7 @@ from django.urls import reverse
 
 from api import ai
 from api.models import Document
+from api.rag import retrieve_relevant_chunks
 
 
 class RegistrationValidationTests(TestCase):
@@ -236,3 +237,97 @@ class AIProviderTests(TestCase):
             self.assertEqual(provider.generate("hi"), "gemini")
             client.models.generate_content.return_value = SimpleNamespace(text=None)
             self.assertEqual(provider.generate("hi"), "")
+
+
+class DocumentComparisonTests(TestCase):
+    def setUp(self):
+        media = tempfile.TemporaryDirectory()
+        self.addCleanup(media.cleanup)
+        settings_override = override_settings(MEDIA_ROOT=media.name)
+        settings_override.enable()
+        self.addCleanup(settings_override.disable)
+        self.user = get_user_model().objects.create_user(
+            username="comparison-owner",
+            password="secure-password",
+        )
+        self.first = Document.objects.create(
+            owner=self.user,
+            title="Sutartis",
+            file=SimpleUploadedFile("sutartis-v1.pdf", b"v1"),
+            original_filename="sutartis-v1.pdf",
+            file_size=2,
+            simplified_explanation="Pirma versija",
+            key_conditions=["Sena sąlyga"],
+        )
+        self.second = Document.objects.create(
+            owner=self.user,
+            title="Sutartis",
+            file=SimpleUploadedFile("sutartis-v2.pdf", b"v2"),
+            original_filename="sutartis-v2.pdf",
+            file_size=2,
+            simplified_explanation="Antra versija",
+            key_conditions=["Nauja sąlyga"],
+        )
+        self.client.force_login(self.user)
+
+    @mock.patch("api.views.documents.get_gemini_provider")
+    def test_comparison_returns_separate_difference_report(self, get_provider):
+        get_provider.return_value.generate.return_value = (
+            "PRIDĖTA\n1. Nauja sąlyga (sutartis-v2.pdf)\n"
+            "PAŠALINTA\n1. Sena sąlyga (sutartis-v1.pdf)\n"
+            "PAKEISTA\n1. Nėra."
+        )
+
+        response = self.client.post(
+            reverse("document-compare"),
+            data=json.dumps(
+                {
+                    "first_document_id": self.first.pk,
+                    "second_document_id": self.second.pk,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["has_differences"])
+        self.assertIn("PRIDĖTA", response.json()["report"])
+        prompt = get_provider.return_value.generate.call_args.args[0]
+        self.assertIn("SKIRTUMŲ NĖRA", prompt)
+        self.assertIn("sunumeruotu sąrašu", prompt)
+        self.assertIn("'1. ...', '2. ...'", prompt)
+        self.assertIn("nenaudok brūkšnelių", prompt)
+        self.assertIn("nekartok dokumento pavadinimo", prompt)
+        self.assertIn("sutartis-v1.pdf", prompt)
+        self.assertIn("sutartis-v2.pdf", prompt)
+
+    @mock.patch("api.views.documents.get_gemini_provider")
+    def test_comparison_reports_no_differences(self, get_provider):
+        get_provider.return_value.generate.return_value = "SKIRTUMŲ NĖRA"
+
+        response = self.client.post(
+            reverse("document-compare"),
+            data=json.dumps(
+                {
+                    "first_document_id": self.first.pk,
+                    "second_document_id": self.second.pk,
+                }
+            ),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["has_differences"])
+
+
+class DocumentRetrievalTests(TestCase):
+    def test_retrieval_prioritizes_chunks_matching_the_question(self):
+        chunks = [
+            "Šalys susitaria dėl sutarties nutraukimo įspėjimo termino.",
+            "Mokėjimai atliekami kiekvieno mėnesio pirmą dieną.",
+            "Dokumentas pasirašomas elektroniniu parašu.",
+        ]
+
+        relevant = retrieve_relevant_chunks(chunks, "Koks sutarties nutraukimo terminas?", limit=1)
+
+        self.assertEqual(relevant, [chunks[0]])

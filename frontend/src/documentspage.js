@@ -177,6 +177,32 @@ function showDocumentsMessage(text, colorClass) {
   documentsMessage.className = `mb-2 min-h-5 text-sm font-medium ${colorClass}`;
 }
 
+function renderComparisonReport(report) {
+  comparisonReport.replaceChildren();
+  const differenceStyles = {
+    'PRIDĖTA': ['text-emerald-300', 'added'],
+    'PAŠALINTA': ['text-rose-300', 'removed'],
+    'PAKEISTA': ['text-yellow-300', 'changed'],
+  };
+
+  const lines = report.split('\n');
+  lines.forEach((line, index) => {
+    const match = line.match(/^(\s*)(PRIDĖTA|PAŠALINTA|PAKEISTA)\b(.*)$/);
+    if (match) {
+      const [, whitespace, label, remainder] = match;
+      const labelElement = document.createElement('span');
+      const [colorClass, differenceType] = differenceStyles[label];
+      labelElement.className = `font-semibold ${colorClass}`;
+      labelElement.dataset.differenceType = differenceType;
+      labelElement.textContent = label;
+      comparisonReport.append(whitespace, labelElement, remainder);
+    } else {
+      comparisonReport.append(line);
+    }
+    if (index < lines.length - 1) comparisonReport.append('\n');
+  });
+}
+
 function closePreview() {
   previewDialog.classList.add('hidden');
   previewFrame.src = '';
@@ -413,9 +439,16 @@ runComparisonButton.addEventListener('click', async () => {
       return;
     }
     if (!response.ok) throw new Error('Comparison request failed');
-    comparisonReport.textContent = (await response.json()).report;
-    comparisonReport.classList.remove('hidden');
-    comparisonMessage.textContent = '';
+    const result = await response.json();
+    const hasDifferences = result.has_differences ?? result.report.trim().toUpperCase() !== 'SKIRTUMŲ NĖRA';
+    if (hasDifferences) {
+      renderComparisonReport(result.report);
+      comparisonReport.classList.remove('hidden');
+      comparisonMessage.textContent = '';
+    } else {
+      comparisonMessage.textContent = 'Skirtumų nenustatyta.';
+      comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-emerald-300';
+    }
   } catch {
     comparisonMessage.textContent = 'Dokumentų palyginti nepavyko';
     comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-300';

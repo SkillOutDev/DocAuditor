@@ -9,6 +9,7 @@ from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.serializers import (
+    BooleanField,
     CharField,
     DictField,
     FileField,
@@ -20,6 +21,7 @@ from rest_framework.views import APIView
 
 from api.models import Document
 from api.ai import AIProviderError, get_gemini_provider
+from api.rag import DocumentRetrievalError, document_context
 
 
 class DocumentSerializer(Serializer):
@@ -68,6 +70,7 @@ class DocumentComparisonRequestSerializer(Serializer):
 
 class DocumentComparisonResponseSerializer(Serializer):
     report = CharField()
+    has_differences = BooleanField()
 
 
 class ManualDocumentAuthenticationPermission(AllowAny):
@@ -166,16 +169,15 @@ def ask_document_question(request, document_id):
 
     prompt = (
         "Atsakyk lietuviškai į naudotojo klausimą apie pasirinktą dokumentą. "
-        "Remkis tik pateikta dokumento informacija. Jei informacijos nepakanka, "
+        "Remkis tik pateiktais dokumento fragmentais. Jei informacijos nepakanka, "
         "aiškiai tai pasakyk ir nesugalvok faktų.\n\n"
         f"Dokumento pavadinimas: {document.original_filename}\n"
-        f"Dokumento paaiškinimas: {document.simplified_explanation or 'Nėra.'}\n"
-        f"Pagrindinės sąlygos: {document.key_conditions or 'Nėra.'}\n\n"
+        f"Susiję dokumento fragmentai:\n{document_context(document, question)}\n\n"
         f"Naudotojo klausimas: {question}"
     )
     try:
         answer = get_gemini_provider().generate(prompt).strip()
-    except (AIProviderError, OSError, KeyError, ValueError):
+    except (AIProviderError, DocumentRetrievalError, OSError, KeyError, ValueError):
         return JsonResponse({"message": "Nepavyko sukurti pokalbio."}, status=502)
 
     if not answer:
@@ -234,19 +236,22 @@ def compare_document_versions(request):
     second = next(document for document in documents if document.id == second_id)
     prompt = (
         "Atsakyk lietuviškai ir palygink dvi to paties dokumento versijas. "
-        "Pateik aiškią ataskaitą punktais: kas pridėta, pašalinta arba pakeista. "
-        "Jei pateiktos informacijos nepakanka, tai aiškiai nurodyk.\n\n"
+        "Naudok tik pateiktą informaciją ir pateik ataskaitą tiksliai trimis "
+        "atskiromis antraštėmis: PRIDĖTA, PAŠALINTA, PAKEISTA. "
+        "Kiekvienos antraštės skirtumus pateik sunumeruotu sąrašu, naudojant "
+        "formatą '1. ...', '2. ...'; nenaudok brūkšnelių ar kitų sąrašo žymenų. "
+        "Versijų pavadinimai jau pateikti žemiau, todėl nekartok dokumento "
+        "pavadinimo prie kiekvieno punkto. Jei skirtumų nėra, atsakyk tiksliai "
+        "'SKIRTUMŲ NĖRA'. Jei informacijos nepakanka, aiškiai tai nurodyk.\n\n"
         f"Dokumentas: {first.title}\n"
         f"Pirma versija ({first.original_filename}, {first.created_at.isoformat()}):\n"
-        f"Paaiškinimas: {first.simplified_explanation or 'Nėra.'}\n"
-        f"Sąlygos: {first.key_conditions or 'Nėra.'}\n\n"
+        f"Atitinkami pirmos versijos fragmentai:\n{document_context(first, limit=12)}\n\n"
         f"Antra versija ({second.original_filename}, {second.created_at.isoformat()}):\n"
-        f"Paaiškinimas: {second.simplified_explanation or 'Nėra.'}\n"
-        f"Sąlygos: {second.key_conditions or 'Nėra.'}"
+        f"Atitinkami antros versijos fragmentai:\n{document_context(second, limit=12)}"
     )
     try:
         report = get_gemini_provider().generate(prompt).strip()
-    except (AIProviderError, OSError, KeyError, ValueError):
+    except (AIProviderError, DocumentRetrievalError, OSError, KeyError, ValueError):
         return JsonResponse(
             {"message": "Dokumentų palyginti nepavyko"},
             status=502,
@@ -257,7 +262,8 @@ def compare_document_versions(request):
             {"message": "Dokumentų palyginti nepavyko"},
             status=502,
         )
-    return JsonResponse({"report": report})
+    has_differences = report.strip().upper() != "SKIRTUMŲ NĖRA"
+    return JsonResponse({"report": report, "has_differences": has_differences})
 
 
 class DocumentCollectionView(APIView):

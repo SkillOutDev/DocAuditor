@@ -234,6 +234,52 @@ describe('documents page', () => {
     });
   });
 
+  describe('comparison', () => {
+    const versions = [
+      { ...doc, title: 'sutartis' },
+      { id: 2, title: 'sutartis', original_filename: 'sutartis-v2.pdf', created_at: '2026-01-03T10:00:00Z' },
+    ];
+
+    async function openComparison(response) {
+      await loadPage({
+        ...baseRoutes(versions),
+        'GET /api/documents/1/preview/': () => ({
+          ok: true,
+          status: 200,
+          blob: async () => new Blob(['x'], { type: 'application/pdf' }),
+        }),
+        'POST /api/documents/compare/': () => json(response),
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#compare-documents-button').click();
+      $('#first-version-select').value = '1';
+      $('#second-version-select').value = '2';
+      $('#run-comparison-button').click();
+      await flush();
+    }
+
+    it('shows separate differences after a successful comparison', async () => {
+      await openComparison({
+        report: 'PRIDĖTA\n- Nauja sąlyga (sutartis-v2.pdf)\nPAŠALINTA\n- Sena sąlyga\nPAKEISTA\n- Pakeista sąlyga',
+        has_differences: true,
+      });
+
+      expect($('#comparison-report').textContent).toContain('PRIDĖTA');
+      expect($('#comparison-message').textContent).toBe('');
+      expect($('[data-difference-type="added"]').className).toContain('text-emerald-300');
+      expect($('[data-difference-type="removed"]').className).toContain('text-rose-300');
+      expect($('[data-difference-type="changed"]').className).toContain('text-yellow-300');
+    });
+
+    it('informs the client when no differences were found', async () => {
+      await openComparison({ report: 'SKIRTUMŲ NĖRA', has_differences: false });
+
+      expect($('#comparison-report').classList.contains('hidden')).toBe(true);
+      expect($('#comparison-message').textContent).toBe('Skirtumų nenustatyta.');
+    });
+  });
+
   describe('delete', () => {
     const deleteRoutes = (status) => ({
       ...baseRoutes(),
