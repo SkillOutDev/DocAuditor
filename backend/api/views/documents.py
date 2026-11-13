@@ -2,11 +2,13 @@ import json
 import base64
 import io
 import os
+from datetime import datetime
 from pathlib import Path
 from mimetypes import guess_type
 
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError
+from django.db.models import Q
 from django.http import FileResponse, HttpResponse, JsonResponse
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.parsers import MultiPartParser
@@ -398,6 +400,37 @@ class DocumentCollectionView(APIView):
             )
 
         user_documents = Document.objects.filter(owner=request.user)
+        title_filter = (request.GET.get("title") or "").strip()
+        date_filter = (request.GET.get("date") or "").strip()
+        type_filter = (request.GET.get("type") or "").strip().lower()
+
+        if title_filter:
+            title_lookup = title_filter.lower()
+            user_documents = user_documents.filter(
+                Q(title__icontains=title_lookup) | Q(original_filename__icontains=title_lookup)
+            )
+
+        if date_filter:
+            try:
+                datetime.strptime(date_filter, "%Y-%m-%d")
+            except ValueError:
+                user_documents = user_documents.none()
+            else:
+                user_documents = user_documents.filter(created_at__date=date_filter)
+
+        if type_filter:
+            normalized_type = {
+                "pdf": ".pdf",
+                "doc": ".doc",
+                "docx": ".docx",
+            }.get(type_filter)
+            if normalized_type:
+                user_documents = user_documents.filter(original_filename__iendswith=normalized_type)
+            else:
+                user_documents = user_documents.filter(
+                    Q(content_type__icontains=type_filter) | Q(original_filename__icontains=type_filter)
+                )
+
         return JsonResponse(
             {"documents": [_serialize_document(document) for document in user_documents]}
         )

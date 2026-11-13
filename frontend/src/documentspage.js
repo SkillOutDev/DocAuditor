@@ -34,6 +34,30 @@ document.querySelector('#app').innerHTML = `
         </form>
       </div>
       <div class="rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-6 shadow-2xl shadow-black/20">
+        <form id="documents-filter-form" class="mb-5 grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Pavadinimas</span>
+            <div class="relative">
+              <input id="filter-title" type="text" placeholder="Ieškoti pagal pavadinimą" class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-3 py-2 text-sm text-alabaster-grey-50 outline-none transition placeholder:text-charcoal-blue-400 focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20" autocomplete="off" />
+              <div id="filter-title-suggestions" class="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-20 hidden max-h-56 overflow-y-auto rounded-xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 p-2 shadow-2xl shadow-black/20"></div>
+            </div>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Data</span>
+            <input id="filter-date" type="date" class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-3 py-2 text-sm text-alabaster-grey-50 outline-none transition focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20" />
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Tipas</span>
+            <select id="filter-type" class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-3 py-2 text-sm text-alabaster-grey-50 outline-none transition focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20">
+              <option value="">Visi tipai</option>
+              <option value="pdf">PDF</option>
+              <option value="doc">DOC</option>
+              <option value="docx">DOCX</option>
+            </select>
+          </label>
+          <button id="apply-filters-button" type="submit" class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">Filtruoti</button>
+          <button id="clear-filters-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">Išvalyti</button>
+        </form>
         <p id="documents-status" class="text-sm text-powder-blue-400" aria-live="polite">Kraunama...</p>
         <p id="documents-message" class="mb-2 min-h-5 text-sm font-medium" aria-live="polite"></p>
         <ul id="documents-list" class="divide-y divide-charcoal-blue-700/80"></ul>
@@ -146,6 +170,12 @@ initializeThemeToggle();
 const status = document.querySelector('#documents-status');
 const documentsMessage = document.querySelector('#documents-message');
 const list = document.querySelector('#documents-list');
+const filterForm = document.querySelector('#documents-filter-form');
+const filterTitleInput = document.querySelector('#filter-title');
+const filterTitleSuggestions = document.querySelector('#filter-title-suggestions');
+const filterDateInput = document.querySelector('#filter-date');
+const filterTypeSelect = document.querySelector('#filter-type');
+const clearFiltersButton = document.querySelector('#clear-filters-button');
 const previewDialog = document.querySelector('#preview-dialog');
 const previewTitle = document.querySelector('#preview-title');
 const previewDate = document.querySelector('#preview-date');
@@ -341,10 +371,10 @@ analyzeButton.addEventListener('click', async () => {
   }
 });
 
-function renderDocuments(documents) {
+function renderDocuments(documents, filterActive = hasActiveFilters()) {
   currentDocuments = documents;
   list.replaceChildren();
-  status.textContent = documents.length ? '' : 'Nėra įkeltų dokumentų.';
+  status.textContent = documents.length ? '' : (filterActive ? 'Nerasta dokumentų pagal pasirinktus filtrus.' : 'Nėra įkeltų dokumentų.');
   for (const document_ of documents) {
     const item = document.createElement('li');
     item.className = 'border-b border-charcoal-blue-700/80 last:border-b-0';
@@ -371,6 +401,26 @@ function renderDocuments(documents) {
     list.append(item);
   }
 }
+
+filterForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  hideTitleSuggestions();
+  applyFilters();
+});
+
+filterTitleInput.addEventListener('focus', updateTitleSuggestions);
+filterTitleInput.addEventListener('input', updateTitleSuggestions);
+filterTitleInput.addEventListener('blur', () => {
+  window.setTimeout(hideTitleSuggestions, 120);
+});
+
+clearFiltersButton.addEventListener('click', () => {
+  filterTitleInput.value = '';
+  filterDateInput.value = '';
+  filterTypeSelect.value = '';
+  hideTitleSuggestions();
+  applyFilters();
+});
 
 list.addEventListener('click', (event) => {
   const deleteButton = event.target.closest('button[data-delete-document-id]');
@@ -544,6 +594,96 @@ chatInput.addEventListener('keydown', (event) => {
 });
 
 let currentDocuments = [];
+let allDocuments = [];
+
+function getDocumentType(document_) {
+  const filename = (document_?.original_filename || '').toLowerCase();
+  if (filename.endsWith('.pdf')) return 'pdf';
+  if (filename.endsWith('.docx')) return 'docx';
+  if (filename.endsWith('.doc')) return 'doc';
+  const contentType = (document_?.content_type || '').toLowerCase();
+  if (contentType.includes('pdf')) return 'pdf';
+  if (contentType.includes('docx')) return 'docx';
+  if (contentType.includes('msword') || contentType.includes('document')) return 'doc';
+  return '';
+}
+
+function hasActiveFilters() {
+  return Boolean(filterTitleInput.value.trim() || filterDateInput.value || filterTypeSelect.value);
+}
+
+function getUniqueDocumentTitles() {
+  const uniqueTitles = new Set();
+  for (const document_ of allDocuments) {
+    const title = (document_?.title || document_?.original_filename || '').trim();
+    if (title) uniqueTitles.add(title);
+  }
+  return [...uniqueTitles].sort((left, right) => left.localeCompare(right, 'lt'));
+}
+
+function updateTitleSuggestions() {
+  const query = filterTitleInput.value.trim().toLowerCase();
+  const titles = getUniqueDocumentTitles();
+  const matchingTitles = query
+    ? titles.filter((title) => title.toLowerCase().includes(query))
+    : titles;
+
+  if (!matchingTitles.length) {
+    filterTitleSuggestions.classList.add('hidden');
+    filterTitleSuggestions.replaceChildren();
+    return;
+  }
+
+  filterTitleSuggestions.replaceChildren();
+  for (const title of matchingTitles) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = title;
+    button.className = 'block w-full rounded-lg px-3 py-2 text-left text-sm text-alabaster-grey-50 transition hover:bg-charcoal-blue-800/80';
+    button.addEventListener('click', () => {
+      filterTitleInput.value = title;
+      filterTitleSuggestions.classList.add('hidden');
+      applyFilters();
+    });
+    filterTitleSuggestions.append(button);
+  }
+  filterTitleSuggestions.classList.remove('hidden');
+}
+
+function hideTitleSuggestions() {
+  filterTitleSuggestions.classList.add('hidden');
+}
+
+function applyFilters() {
+  const title = filterTitleInput.value.trim().toLowerCase();
+  const date = filterDateInput.value;
+  const type = filterTypeSelect.value;
+  const active = hasActiveFilters();
+  const filteredDocuments = allDocuments.filter((document_) => {
+    const documentTitle = (document_?.title || document_?.original_filename || '').toLowerCase();
+    const documentDate = new Date(document_?.created_at).toISOString().slice(0, 10);
+    const documentType = getDocumentType(document_);
+    if (title && !documentTitle.includes(title) && !document_.original_filename.toLowerCase().includes(title)) {
+      return false;
+    }
+    if (date && documentDate !== date) return false;
+    if (type && documentType !== type) return false;
+    return true;
+  });
+
+  renderDocuments(filteredDocuments, active);
+
+  if (!filteredDocuments.length && active) {
+    documentsMessage.textContent = 'Nėra dokumentų, atitinkančių pasirinktus filtrus.';
+    documentsMessage.className = 'mb-2 min-h-5 text-sm font-medium text-amber-300';
+    return;
+  }
+
+  if (documentsMessage.textContent === 'Nėra dokumentų, atitinkančių pasirinktus filtrus.') {
+    documentsMessage.textContent = '';
+    documentsMessage.className = 'mb-2 min-h-5 text-sm font-medium';
+  }
+}
 
 async function loadDocuments() {
   try {
@@ -553,7 +693,8 @@ async function loadDocuments() {
       return;
     }
     if (!response.ok) throw new Error('Request failed');
-    renderDocuments((await response.json()).documents);
+    allDocuments = (await response.json()).documents || [];
+    applyFilters();
   } catch {
     status.textContent = 'Nepavyko įkelti dokumentų sąrašo.';
   }
