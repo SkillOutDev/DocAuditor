@@ -189,8 +189,9 @@ class RegistrationAPITests(TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["message"], "Registracija sėkminga. Galite prisijungti.")
+        self.assertEqual(response.json()["message"], "Registracija sėkminga.")
         self.assertTrue(get_user_model().objects.filter(username="new-user").exists())
+        self.assertEqual(response.wsgi_request.user.username, "new-user")
 
 
 class LoginAPITests(TestCase):

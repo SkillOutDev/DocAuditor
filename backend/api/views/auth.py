@@ -134,7 +134,7 @@ def register(request):
 
     try:
         with transaction.atomic():
-            User.objects.create_user(
+            user = User.objects.create_user(
                 username=username,
                 email=email,
                 password=password,
@@ -145,8 +145,9 @@ def register(request):
             status=409,
         )
 
+    auth_login(request._request, user)
     return JsonResponse(
-        {"message": "Registracija sėkminga. Galite prisijungti."},
+        {"message": "Registracija sėkminga."},
         status=201,
     )
 

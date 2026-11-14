@@ -11,13 +11,6 @@ document.querySelector('#app').innerHTML = `
       </div>
 
       <form id="register-form" novalidate class="rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-7 shadow-2xl shadow-black/20 sm:p-8">
-        <section id="privacy-notice" class="mb-6 rounded-xl border border-pacific-blue-400/40 bg-pacific-blue-950/40 p-4 text-sm leading-6 text-powder-blue-200" aria-labelledby="privacy-notice-title">
-          <h2 id="privacy-notice-title" class="font-semibold text-alabaster-grey-50">Privatumo informacija</h2>
-          <p class="mt-2">Prieš registruodamiesi peržiūrėkite, kaip tvarkomi jūsų duomenys.</p>
-          <button id="privacy-open-button" type="button" class="mt-2 font-semibold text-pacific-blue-300 underline decoration-pacific-blue-300/60 underline-offset-4 hover:text-pacific-blue-200 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">
-            Terms and conditions
-          </button>
-        </section>
         <div class="space-y-5">
           <div>
             <label for="username" class="mb-2 block text-sm font-medium text-powder-blue-200">Vartotojo vardas</label>
@@ -26,7 +19,7 @@ document.querySelector('#app').innerHTML = `
             <p id="username-error" class="mt-1 hidden text-xs text-rose-300" aria-live="polite"></p>
           </div>
           <div>
-            <label for="email" class="mb-2 block text-sm font-medium text-powder-blue-200">El. paštas</label>
+            <label for="email" class="mb-2 block text-sm font-medium text-powder-blue-200">Elektroninis paštas</label>
             <input id="email" name="email" type="email" autocomplete="email" placeholder="vardas@pastas.lt" required
               class="register-input w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-4 py-3 text-sm text-alabaster-grey-50 outline-none transition placeholder:text-charcoal-blue-400 focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20" />
             <p id="email-error" class="mt-1 hidden text-xs text-rose-300" aria-live="polite"></p>
@@ -40,7 +33,20 @@ document.querySelector('#app').innerHTML = `
           </div>
         </div>
 
-        <p id="register-message" class="mt-5 min-h-5 text-center text-sm font-medium" aria-live="polite"></p>
+        <p id="register-message" class="mt-2 min-h-5 text-center text-sm font-medium" aria-live="polite"></p>
+        <div id="privacy-notice" class="mt-1 text-sm leading-6 text-powder-blue-200">
+          <div class="flex items-start gap-3">
+            <input id="terms-consent" type="checkbox" required aria-describedby="terms-error"
+              class="mt-1 h-4 w-4 shrink-0 rounded border-charcoal-blue-500 bg-carbon-black-950 text-pacific-blue-500 accent-pacific-blue-500 focus:ring-2 focus:ring-pacific-blue-400/40" />
+            <label for="terms-consent">
+              Sutinku su
+              <button id="privacy-open-button" type="button" class="font-semibold text-pacific-blue-300 underline decoration-pacific-blue-300/60 underline-offset-4 hover:text-pacific-blue-200 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">
+                naudojimo sąlygomis ir privatumo informacija
+              </button>.
+            </label>
+          </div>
+          <p id="terms-error" class="mt-1 hidden pl-7 text-xs text-rose-300" aria-live="polite">Patvirtinkite naudojimo sąlygas ir privatumo informaciją.</p>
+        </div>
         <button type="submit"
           class="mt-4 w-full rounded-xl bg-pacific-blue-500 px-4 py-3 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300 focus:ring-offset-2 focus:ring-offset-charcoal-blue-950">
           Sukurti paskyrą
@@ -53,7 +59,7 @@ document.querySelector('#app').innerHTML = `
     <div id="privacy-dialog" class="fixed inset-0 z-30 hidden items-center justify-center bg-carbon-black-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="privacy-dialog-title">
       <section class="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 p-6 shadow-2xl">
         <header class="flex items-center justify-between gap-4">
-          <h2 id="privacy-dialog-title" class="text-lg font-semibold text-alabaster-grey-50">Terms and conditions</h2>
+          <h2 id="privacy-dialog-title" class="text-lg font-semibold text-alabaster-grey-50">Naudojimo sąlygos ir privatumo informacija</h2>
           <button id="privacy-close-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">
             Uždaryti
           </button>
@@ -62,7 +68,7 @@ document.querySelector('#app').innerHTML = `
           <p>Prieš pateikdami registracijos duomenis susipažinkite su tuo, kaip sistema juos tvarko.</p>
           <div>
             <h3 class="font-semibold text-alabaster-grey-100">Kokius duomenis renkame?</h3>
-            <p>Renkame vartotojo vardą, el. pašto adresą ir paskyros slaptažodį. Slaptažodis saugomas tik užšifruotu (maišos) pavidalu.</p>
+            <p>Renkame vartotojo vardą, elektroninio pašto adresą ir paskyros slaptažodį. Slaptažodis saugomas tik užšifruotu (maišos) pavidalu.</p>
           </div>
           <div>
             <h3 class="font-semibold text-alabaster-grey-100">Kaip naudojame duomenis?</h3>
@@ -74,7 +80,7 @@ document.querySelector('#app').innerHTML = `
           </div>
           <div>
             <h3 class="font-semibold text-alabaster-grey-100">Kas gali pasiekti duomenis?</h3>
-            <p>Duomenis gali pasiekti tik sistemos administratoriai ir paslaugų teikėjai, būtini sistemos veikimui. Jie gali būti perduodami DI paslaugos teikėjui tik dokumentų analizės ir klausimų atsakymo funkcijoms vykdyti.</p>
+            <p>Duomenis gali pasiekti tik sistemos administratoriai ir paslaugų teikėjai, būtini sistemos veikimui. Jie gali būti perduodami dirbtinio intelekto paslaugos teikėjui tik dokumentų analizės ir klausimų atsakymo funkcijoms vykdyti.</p>
           </div>
         </div>
       </section>
@@ -90,6 +96,8 @@ const submitButton = form.querySelector('button[type="submit"]');
 const privacyDialog = document.querySelector('#privacy-dialog');
 const privacyOpenButton = document.querySelector('#privacy-open-button');
 const privacyCloseButton = document.querySelector('#privacy-close-button');
+const termsConsent = document.querySelector('#terms-consent');
+const termsError = document.querySelector('#terms-error');
 const fieldNames = ['username', 'email', 'password'];
 
 function clearFieldError(name) {
@@ -134,6 +142,9 @@ document.addEventListener('keydown', (event) => {
 for (const name of fieldNames) {
   form.elements.namedItem(name).addEventListener('input', () => clearFieldError(name));
 }
+termsConsent.addEventListener('change', () => {
+  termsError.classList.toggle('hidden', termsConsent.checked);
+});
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -147,12 +158,17 @@ form.addEventListener('submit', async (event) => {
 
   values.username = String(values.username).trim();
   values.email = String(values.email).trim();
+  if (!termsConsent.checked) {
+    termsError.classList.remove('hidden');
+    termsConsent.focus();
+    return;
+  }
   if (!values.username) errors.username = 'Įveskite vartotojo vardą.';
   else if (values.username.length > 150) errors.username = 'Vartotojo vardas negali viršyti 150 simbolių.';
   if (!String(values.email).trim()) {
-    errors.email = 'Įveskite el. pašto adresą.';
+    errors.email = 'Įveskite elektroninio pašto adresą.';
   } else if (!form.elements.namedItem('email').validity.valid) {
-    errors.email = 'Įveskite galiojantį el. pašto adresą.';
+    errors.email = 'Įveskite galiojantį elektroninio pašto adresą.';
   }
   if (String(values.password).length < 8 || String(values.password).length > 128) {
     errors.password = 'Slaptažodį turi sudaryti 8–128 simboliai.';
@@ -182,9 +198,7 @@ form.addEventListener('submit', async (event) => {
       return;
     }
 
-    message.textContent = result.message;
-    message.className = 'mt-5 min-h-5 text-center text-sm font-medium text-emerald-300';
-    form.reset();
+    window.location.assign('/documents');
   } catch {
     message.textContent = 'Nepavyko susisiekti su serveriu. Patikrinkite, ar veikia Django API.';
     message.className = 'mt-5 min-h-5 text-center text-sm font-medium text-rose-300';
