@@ -14,6 +14,7 @@ function fill({ username = 'jonas', email = 'jonas@example.com', password = 'lon
   $('#username').value = username;
   $('#email').value = email;
   $('#password').value = password;
+  $('#terms-consent').checked = true;
 }
 
 async function submit() {
@@ -24,7 +25,11 @@ async function submit() {
 const error = (name) => $(`#${name}-error`);
 
 describe('register page', () => {
+  let assign;
+
   beforeEach(() => {
+    assign = vi.fn();
+    vi.stubGlobal('location', { assign });
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -33,18 +38,19 @@ describe('register page', () => {
     fill({ username: ' ', email: '', password: '' });
     await submit();
     expect(error('username').textContent).toBe('Įveskite vartotojo vardą.');
-    expect(error('email').textContent).toBe('Įveskite el. pašto adresą.');
+    expect(error('email').textContent).toBe('Įveskite elektroninio pašto adresą.');
     expect(error('password').textContent).toBe('Slaptažodį turi sudaryti 8–128 simboliai.');
     expect($('#username').getAttribute('aria-invalid')).toBe('true');
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('shows privacy information before the registration fields', async () => {
+  it('shows a terms checkbox and privacy link', async () => {
     await loadPage();
 
     expect($('#privacy-notice')).not.toBeNull();
-    expect($('#privacy-open-button').textContent).toContain('Terms and conditions');
-    expect($('#privacy-notice').compareDocumentPosition($('#username')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect($('#terms-consent')).not.toBeNull();
+    expect($('#privacy-open-button').textContent).toContain('naudojimo sąlygomis');
+    expect($('#privacy-notice').compareDocumentPosition($('button[type="submit"]')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('opens and closes the terms overlay', async () => {
@@ -52,8 +58,8 @@ describe('register page', () => {
 
     $('#privacy-open-button').click();
     expect($('#privacy-dialog').classList.contains('hidden')).toBe(false);
-    expect($('#privacy-dialog').textContent).toContain('el. pašto adresą');
-    expect($('#privacy-dialog').textContent).toContain('DI paslaugos teikėjui');
+    expect($('#privacy-dialog').textContent).toContain('elektroninio pašto adresą');
+    expect($('#privacy-dialog').textContent).toContain('dirbtinio intelekto paslaugos teikėjui');
 
     $('#privacy-close-button').click();
     expect($('#privacy-dialog').classList.contains('hidden')).toBe(true);
@@ -64,8 +70,17 @@ describe('register page', () => {
     fill({ username: 'x'.repeat(151), email: 'not-an-email', password: 'p'.repeat(129) });
     await submit();
     expect(error('username').textContent).toBe('Vartotojo vardas negali viršyti 150 simbolių.');
-    expect(error('email').textContent).toBe('Įveskite galiojantį el. pašto adresą.');
+    expect(error('email').textContent).toBe('Įveskite galiojantį elektroninio pašto adresą.');
     expect(error('password').classList.contains('hidden')).toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('requires accepting the terms before registration', async () => {
+    await loadPage();
+    fill();
+    $('#terms-consent').checked = false;
+    await submit();
+    expect($('#terms-error').classList.contains('hidden')).toBe(false);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -90,8 +105,7 @@ describe('register page', () => {
         body: JSON.stringify({ username: 'jonas', email: 'jonas@example.com', password: 'longenough1' }),
       }),
     );
-    expect($('#register-message').textContent).toBe('Registracija sėkminga. Galite prisijungti.');
-    expect($('#username').value).toBe('');
+    expect(assign).toHaveBeenCalledWith('/documents');
     expect($('button[type="submit"]').disabled).toBe(false);
   });
 
