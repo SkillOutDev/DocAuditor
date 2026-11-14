@@ -178,7 +178,13 @@ tekstas pirmiausia siunčiamas į „Gemini“ (Google); jei užklausa nepavykst
 grąžina tuščią ar ilgesnę nei 700 simbolių santrauką, naudojamas vietinis
 „Ollama“. Sugeneruota santrauka iš pradžių rodoma tik naudotojui; ji išsaugoma
 kartu su dokumento metaduomenimis tik paspaudus „Išsaugoti analizę“. Mygtukas
-„Gauti santrauką“ atsisiunčia išsaugotą santrauką PDF formatu.
+„Gauti santrauką“ atsisiunčia išsaugotą santrauką ir rizikų vertinimą PDF
+formatu.
+
+Analizėje taip pat pateikiamas skyrius „Nustatytos rizikos ir grėsmės“.
+Rizikos suskirstomos į dideles, vidutines ir mažas, nurodant kategoriją,
+paaiškinimą klientui bei susijusį sutarties punktą. Jei rizikų nenustatoma,
+rodoma „Kritinių ar paslėptų grėsmių dokumente neaptikta“.
 
 „Ollama“ santraukos riba yra 2000 simbolių, todėl jos gali viršyti pradiniame
 US-9 reikalavime numatytą 700 simbolių ribą. „Gemini“ riba išlieka 700.

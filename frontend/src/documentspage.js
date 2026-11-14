@@ -112,6 +112,7 @@ document.querySelector('#app').innerHTML = `
         <div class="max-h-52 overflow-y-auto border-b border-charcoal-blue-700/80 px-5 py-3 text-sm text-powder-blue-300">
           <p id="analysis-status" class="mt-2" aria-live="polite"></p>
           <p id="analysis-summary" class="mt-2 whitespace-pre-wrap text-alabaster-grey-50"></p>
+          <div id="analysis-risks" class="mt-3 hidden"></div>
           <div class="mt-2 flex items-center justify-end gap-3">
             <a id="analysis-download" class="hidden font-semibold text-pacific-blue-300" download>Gauti santrauką</a>
             <button id="save-analysis-button" type="button" class="hidden rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 disabled:opacity-50">
@@ -192,6 +193,7 @@ const previewDeleteButton = document.querySelector('#preview-delete-button');
 const analyzeButton = document.querySelector('#analyze-button');
 const analysisStatus = document.querySelector('#analysis-status');
 const analysisSummary = document.querySelector('#analysis-summary');
+const analysisRisks = document.querySelector('#analysis-risks');
 const saveAnalysisButton = document.querySelector('#save-analysis-button');
 const analysisDownload = document.querySelector('#analysis-download');
 const analyzingDocuments = new Set();
@@ -385,8 +387,9 @@ async function openDocumentPreview(document_) {
 
 function renderAnalysis(document_) {
   const analyzing = analyzingDocuments.has(document_.id);
-  const generatedSummary = generatedAnalyses.get(document_.id);
-  const summary = generatedSummary || document_.simplified_explanation || '';
+  const generatedAnalysis = generatedAnalyses.get(document_.id);
+  const summary = generatedAnalysis?.summary || document_.simplified_explanation || '';
+  const risks = generatedAnalysis?.risks || document_.risk_assessment || [];
   analyzeButton.disabled = analyzing;
   if (analyzing) {
     analysisStatus.textContent = 'Dokumentas analizuojamas...';
@@ -394,9 +397,57 @@ function renderAnalysis(document_) {
     analysisStatus.textContent = '';
   }
   analysisSummary.textContent = summary;
-  saveAnalysisButton.classList.toggle('hidden', !generatedSummary);
+  renderRisks(risks, Boolean(summary || generatedAnalysis));
+  saveAnalysisButton.classList.toggle('hidden', !generatedAnalysis);
   analysisDownload.classList.toggle('hidden', !document_.simplified_explanation);
   analysisDownload.href = `/api/documents/${document_.id}/summary.pdf`;
+}
+
+function renderRisks(risks, hasAnalysis) {
+  analysisRisks.replaceChildren();
+  analysisRisks.classList.toggle('hidden', !hasAnalysis);
+  if (!hasAnalysis) return;
+  const riskLevelOrder = { high: 0, medium: 1, low: 2 };
+  const orderedRisks = [...risks].sort(
+    (left, right) => (riskLevelOrder[left.level] ?? 3) - (riskLevelOrder[right.level] ?? 3),
+  );
+
+  const heading = document.createElement('h3');
+  heading.className = 'font-semibold text-alabaster-grey-50';
+  heading.textContent = 'Nustatytos rizikos ir grėsmės';
+  analysisRisks.append(heading);
+  if (!orderedRisks.length) {
+    const empty = document.createElement('p');
+    empty.className = 'mt-1 text-emerald-300';
+    empty.textContent = 'Kritinių ar paslėptų grėsmių dokumente neaptikta';
+    analysisRisks.append(empty);
+    return;
+  }
+
+  const levelStyles = {
+    high: ['Didelė', 'text-rose-300'],
+    medium: ['Vidutinė', 'text-yellow-300'],
+    low: ['Maža', 'text-emerald-300'],
+  };
+  const list = document.createElement('div');
+  list.className = 'mt-2 space-y-3';
+  for (const risk of orderedRisks) {
+    const [levelLabel, levelClass] = levelStyles[risk.level] || levelStyles.medium;
+    const item = document.createElement('article');
+    item.className = 'rounded-lg border border-charcoal-blue-700/80 p-3';
+    const title = document.createElement('p');
+    title.className = `font-semibold ${levelClass}`;
+    title.textContent = `${levelLabel} rizika · ${risk.category}`;
+    const explanation = document.createElement('p');
+    explanation.className = 'mt-1 text-powder-blue-200';
+    explanation.textContent = risk.explanation;
+    const clause = document.createElement('p');
+    clause.className = 'mt-1 text-xs text-powder-blue-400';
+    clause.textContent = `Susijęs punktas: ${risk.clause}`;
+    item.append(title, explanation, clause);
+    list.append(item);
+  }
+  analysisRisks.append(list);
 }
 
 analyzeButton.addEventListener('click', async () => {
@@ -416,7 +467,7 @@ analyzeButton.addEventListener('click', async () => {
     }
     if (!response.ok) throw new Error('Analysis request failed');
     const result = await response.json();
-    generatedAnalyses.set(document_.id, result.summary);
+    generatedAnalyses.set(document_.id, { summary: result.summary, risks: result.risks || [] });
     if (previewDocument?.id === document_.id) renderAnalysis(document_);
   } catch {
     if (previewDocument?.id === document_.id) analysisStatus.textContent = 'Analizė nepavyko, bandykite dar kartą';
@@ -432,8 +483,9 @@ analyzeButton.addEventListener('click', async () => {
 
 saveAnalysisButton.addEventListener('click', async () => {
   const document_ = previewDocument;
-  const summary = document_ && generatedAnalyses.get(document_.id);
-  if (!document_ || !summary) return;
+  const generatedAnalysis = document_ && generatedAnalyses.get(document_.id);
+  if (!document_ || !generatedAnalysis) return;
+  const { summary, risks } = generatedAnalysis;
   saveAnalysisButton.disabled = true;
   try {
     const response = await fetch(`/api/documents/${document_.id}/analysis/save/`, {
@@ -443,7 +495,7 @@ saveAnalysisButton.addEventListener('click', async () => {
         'X-CSRFToken': await getCsrfToken(),
       },
       credentials: 'same-origin',
-      body: JSON.stringify({ summary }),
+      body: JSON.stringify({ summary, risks }),
     });
     if (response.status === 401) {
       window.location.replace('/login');
@@ -451,6 +503,7 @@ saveAnalysisButton.addEventListener('click', async () => {
     }
     if (!response.ok) throw new Error('Analysis save request failed');
     document_.simplified_explanation = summary;
+    document_.risk_assessment = risks;
     generatedAnalyses.delete(document_.id);
     renderAnalysis(document_);
     showAnalysisSuccess(document_.id);

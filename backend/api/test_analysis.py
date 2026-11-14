@@ -50,16 +50,24 @@ class AnalysisTests(TestCase):
         self.assertEqual(client.post(self.url).status_code, 403)
         token = client.get(reverse("csrf")).cookies["csrftoken"].value
         with patch("api.views.analysis.extract_document_text", return_value="Sąlygos"), \
-             patch("api.views.analysis.generate_summary", return_value="Santrauka"):
+             patch("api.views.analysis.generate_summary", return_value="Santrauka"), \
+             patch("api.views.analysis.generate_risk_assessment", return_value=[]):
             self.assertEqual(client.post(self.url, HTTP_X_CSRFTOKEN=token).status_code, 200)
 
     def test_summary_is_only_saved_after_explicit_save_and_downloaded_as_readable_pdf(self):
         self.client.force_login(self.owner)
+        risks = [{
+            "level": "high",
+            "category": "Mokėjimai",
+            "explanation": "Klientui gali tekti mokėti papildomus mokesčius.",
+            "clause": "5.2 punktas",
+        }]
         with patch("api.views.analysis.extract_document_text", return_value="Sąlygos"), \
-             patch("api.views.analysis.generate_summary", return_value="Sąlygos: įmoka ąčęėįšųūž."):
+             patch("api.views.analysis.generate_summary", return_value="Sąlygos: įmoka ąčęėįšųūž."), \
+             patch("api.views.analysis.generate_risk_assessment", return_value=risks):
             response = self.client.post(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"summary": "Sąlygos: įmoka ąčęėįšųūž."})
+        self.assertEqual(response.json(), {"summary": "Sąlygos: įmoka ąčęėįšųūž.", "risks": risks})
         self.document.refresh_from_db()
         self.assertEqual(self.document.simplified_explanation, "")
         self.assertEqual(self.client.get(self.pdf_url).status_code, 404)
@@ -69,6 +77,7 @@ class AnalysisTests(TestCase):
         self.document.refresh_from_db()
         self.assertEqual(self.document.analysis_status, Document.AnalysisStatus.COMPLETED)
         self.assertEqual(self.document.simplified_explanation, "Sąlygos: įmoka ąčęėįšųūž.")
+        self.assertEqual(self.document.risk_assessment, risks)
         listed = self.client.get(reverse("documents")).json()["documents"][0]
         self.assertEqual(listed["simplified_explanation"], self.document.simplified_explanation)
         response = self.client.get(self.pdf_url)
@@ -76,6 +85,10 @@ class AnalysisTests(TestCase):
         self.assertEqual(response["Content-Type"], "application/pdf")
         reader = PdfReader(BytesIO(b"".join(response.streaming_content)))
         self.assertIn("Sąlygos: įmoka ąčęėįšųūž.", reader.pages[0].extract_text())
+        pdf_text = reader.pages[0].extract_text()
+        self.assertIn("Nustatytos rizikos ir grėsmės", pdf_text)
+        self.assertIn("Didelė rizika", pdf_text)
+        self.assertIn("5.2 punktas", pdf_text)
 
     def test_failure_does_not_destroy_previous_summary(self):
         self.document.simplified_explanation = "Ankstesnė santrauka"
@@ -90,6 +103,18 @@ class AnalysisTests(TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["message"], "Analizė nepavyko, bandykite dar kartą")
 
+    def test_risk_assessment_failure_has_specific_message(self):
+        self.client.force_login(self.owner)
+        with patch("api.views.analysis.extract_document_text", return_value="Sąlygos"), \
+             patch("api.views.analysis.generate_summary", return_value="Santrauka"), \
+             patch("api.views.analysis.generate_risk_assessment", side_effect=AnalysisError):
+            response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.json()["message"],
+            "Nepavyko atlikti rizikų vertinimo, bandykite analizuoti iš naujo",
+        )
+
     def test_download_requires_summary(self):
         self.client.force_login(self.owner)
         self.assertEqual(self.client.get(self.pdf_url).status_code, 404)
@@ -102,7 +127,8 @@ class AnalysisTests(TestCase):
         ollama.generate.return_value = summary
         with patch("api.views.analysis.extract_document_text", return_value="Sąlygos"), \
              patch("api.analysis.get_gemini_provider", side_effect=MissingGeminiAPIKey), \
-             patch("api.analysis.OllamaProvider", return_value=ollama):
+             patch("api.analysis.OllamaProvider", return_value=ollama), \
+             patch("api.views.analysis.generate_risk_assessment", return_value=[]):
             response = self.client.post(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["summary"], summary.strip())
