@@ -336,13 +336,19 @@ function addChatMessage(text, sender) {
 
 function openComparison() {
   if (!previewDocument) return;
-  const versions = currentDocuments.filter(({ title }) => title === previewDocument.title);
+  const versions = currentDocuments
+    .filter(({ title }) => title === previewDocument.title)
+    .sort((left, right) => new Date(left.created_at) - new Date(right.created_at));
   firstVersionSelect.replaceChildren();
   secondVersionSelect.replaceChildren();
   for (const version of versions) {
     const label = `${version.original_filename} · ${new Date(version.created_at).toLocaleString('lt-LT')}`;
     firstVersionSelect.add(new Option(label, version.id));
     secondVersionSelect.add(new Option(label, version.id));
+  }
+  if (versions.length >= 2) {
+    firstVersionSelect.value = String(versions[0].id);
+    secondVersionSelect.value = String(versions[versions.length - 1].id);
   }
   comparisonMessage.textContent = versions.length < 2 ? 'Nepasirinkti dokumentai palyginimui' : '';
   comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-300';
