@@ -34,7 +34,7 @@ document.querySelector('#app').innerHTML = `
         </form>
       </div>
       <div class="rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-6 shadow-2xl shadow-black/20">
-        <form id="documents-filter-form" class="mb-5 grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+        <form id="documents-filter-form" class="mb-5 grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
           <label class="block">
             <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Pavadinimas</span>
             <div class="relative">
@@ -53,6 +53,20 @@ document.querySelector('#app').innerHTML = `
               <option value="pdf">PDF</option>
               <option value="doc">DOC</option>
               <option value="docx">DOCX</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Rūšiuoti</span>
+            <select id="sort-by" class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-3 py-2 text-sm text-alabaster-grey-50 outline-none transition focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20">
+              <option value="title">Pavadinimas</option>
+              <option value="date">Data</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Kryptis</span>
+            <select id="sort-direction" class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-3 py-2 text-sm text-alabaster-grey-50 outline-none transition focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20">
+              <option value="asc">Didėjimo</option>
+              <option value="desc">Mažėjimo</option>
             </select>
           </label>
           <button id="apply-filters-button" type="submit" class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">Filtruoti</button>
@@ -181,6 +195,8 @@ const filterTitleInput = document.querySelector('#filter-title');
 const filterTitleSuggestions = document.querySelector('#filter-title-suggestions');
 const filterDateInput = document.querySelector('#filter-date');
 const filterTypeSelect = document.querySelector('#filter-type');
+const sortBySelect = document.querySelector('#sort-by');
+const sortDirectionSelect = document.querySelector('#sort-direction');
 const clearFiltersButton = document.querySelector('#clear-filters-button');
 const previewDialog = document.querySelector('#preview-dialog');
 const previewTitle = document.querySelector('#preview-title');
@@ -557,10 +573,15 @@ filterTitleInput.addEventListener('blur', () => {
   window.setTimeout(hideTitleSuggestions, 120);
 });
 
+sortBySelect.addEventListener('change', applyFilters);
+sortDirectionSelect.addEventListener('change', applyFilters);
+
 clearFiltersButton.addEventListener('click', () => {
   filterTitleInput.value = '';
   filterDateInput.value = '';
   filterTypeSelect.value = '';
+  sortBySelect.value = 'title';
+  sortDirectionSelect.value = 'asc';
   hideTitleSuggestions();
   applyFilters();
 });
@@ -805,6 +826,23 @@ function hideTitleSuggestions() {
   filterTitleSuggestions.classList.add('hidden');
 }
 
+function sortDocuments(documents) {
+  const direction = sortDirectionSelect.value === 'desc' ? -1 : 1;
+  const sortKey = sortBySelect.value;
+
+  return [...documents].sort((left, right) => {
+    if (sortKey === 'date') {
+      const leftDate = new Date(left.created_at).getTime();
+      const rightDate = new Date(right.created_at).getTime();
+      return (leftDate - rightDate) * direction;
+    }
+
+    const leftTitle = (left.original_filename || left.title || '').toLowerCase();
+    const rightTitle = (right.original_filename || right.title || '').toLowerCase();
+    return leftTitle.localeCompare(rightTitle, 'lt') * direction;
+  });
+}
+
 function applyFilters() {
   const title = filterTitleInput.value.trim().toLowerCase();
   const date = filterDateInput.value;
@@ -822,7 +860,7 @@ function applyFilters() {
     return true;
   });
 
-  renderDocuments(filteredDocuments, active);
+  renderDocuments(sortDocuments(filteredDocuments), active);
 
   if (!filteredDocuments.length && active) {
     documentsMessage.textContent = 'Nėra dokumentų, atitinkančių pasirinktus filtrus.';
