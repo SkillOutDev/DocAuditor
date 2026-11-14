@@ -101,6 +101,7 @@ def _serialize_document(document):
         "analysis_status": document.analysis_status,
         "simplified_explanation": document.simplified_explanation,
         "risk_assessment": document.risk_assessment,
+        "privacy_assessment": document.privacy_assessment,
         "created_at": document.created_at.isoformat(),
     }
 

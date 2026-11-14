@@ -186,6 +186,11 @@ Rizikos suskirstomos į dideles, vidutines ir mažas, nurodant kategoriją,
 paaiškinimą klientui bei susijusį sutarties punktą. Jei rizikų nenustatoma,
 rodoma „Kritinių ar paslėptų grėsmių dokumente neaptikta“.
 
+Analizėje pateikiama ir skiltis „Asmens duomenų apsauga ir privatumas“:
+renkami duomenys, jų naudojimo tikslas, saugojimo terminas, perdavimas
+trečiosioms šalims bei įspėjimai apie perdavimą už ES/EEE ribų arba rinkodarą
+be sutikimo.
+
 „Ollama“ santraukos riba yra 2000 simbolių, todėl jos gali viršyti pradiniame
 US-9 reikalavime numatytą 700 simbolių ribą. „Gemini“ riba išlieka 700.
 Jeigu „Ollama“ atsakymas viršija 2000 simbolių, vieną kartą pakartotinai

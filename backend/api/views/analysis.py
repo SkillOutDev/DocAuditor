@@ -15,6 +15,7 @@ from api.analysis import (
     extract_document_text,
     generate_summary,
     generate_risk_assessment,
+    generate_privacy_assessment,
 )
 from api.models import Document
 from api.views.documents import DocumentErrorResponseSerializer, ManualDocumentAuthenticationPermission
@@ -29,6 +30,7 @@ class AnalysisResponseSerializer(Serializer):
         help_text="Gemini summaries are limited to 700 characters; Ollama summaries to 2000.",
     )
     risks = JSONField()
+    privacy = JSONField()
 
 
 class SaveAnalysisRequestSerializer(Serializer):
@@ -37,12 +39,14 @@ class SaveAnalysisRequestSerializer(Serializer):
         allow_blank=False,
     )
     risks = JSONField(required=False, default=list)
+    privacy = JSONField(required=False, default=dict)
 
 
 class SaveAnalysisResponseSerializer(Serializer):
     message = CharField()
     summary = CharField(max_length=OLLAMA_MAX_SUMMARY_LENGTH)
     risks = JSONField()
+    privacy = JSONField()
 
 
 class DocumentAnalysisView(APIView):
@@ -78,7 +82,14 @@ class DocumentAnalysisView(APIView):
                 {"message": "Nepavyko atlikti rizikų vertinimo, bandykite analizuoti iš naujo"},
                 status=502,
             )
-        return JsonResponse({"summary": summary, "risks": risks})
+        try:
+            privacy = generate_privacy_assessment(text)
+        except AnalysisError:
+            return JsonResponse(
+                {"message": "Nepavyko išanalizuoti asmens duomenų sąlygų"},
+                status=502,
+            )
+        return JsonResponse({"summary": summary, "risks": risks, "privacy": privacy})
 
 
 class DocumentAnalysisSaveView(APIView):
@@ -108,6 +119,7 @@ class DocumentAnalysisSaveView(APIView):
             payload = {}
         summary = payload.get("summary")
         risks = payload.get("risks", [])
+        privacy = payload.get("privacy", {})
         if not isinstance(summary, str) or not summary.strip():
             return JsonResponse(
                 {"message": "Analizės išsaugoti nepavyko.", "errors": {"summary": "Santrauka negali būti tuščia."}},
@@ -124,18 +136,30 @@ class DocumentAnalysisSaveView(APIView):
                 {"message": "Analizės išsaugoti nepavyko.", "errors": {"risks": "Netinkamas rizikų formatas."}},
                 status=400,
             )
+        if not isinstance(privacy, dict):
+            return JsonResponse(
+                {"message": "Analizės išsaugoti nepavyko.", "errors": {"privacy": "Netinkamas privatumo formato duomenys."}},
+                status=400,
+            )
         document.simplified_explanation = summary
         document.risk_assessment = risks
+        document.privacy_assessment = privacy
         document.analysis_status = Document.AnalysisStatus.COMPLETED
         document.analysis_error = ""
         document.save(update_fields=[
             "simplified_explanation",
             "risk_assessment",
+            "privacy_assessment",
             "analysis_status",
             "analysis_error",
             "updated_at",
         ])
-        return JsonResponse({"message": "Analizė sėkmingai išsaugota", "summary": summary, "risks": risks})
+        return JsonResponse({
+            "message": "Analizė sėkmingai išsaugota",
+            "summary": summary,
+            "risks": risks,
+            "privacy": privacy,
+        })
 
 
 class DocumentSummaryPDFView(APIView):
@@ -156,7 +180,12 @@ class DocumentSummaryPDFView(APIView):
             return JsonResponse({"message": "Santraukos rasti nepavyko."}, status=404)
         output = BytesIO()
         try:
-            create_summary_pdf(document.simplified_explanation, output, document.risk_assessment)
+            create_summary_pdf(
+                document.simplified_explanation,
+                output,
+                document.risk_assessment,
+                document.privacy_assessment,
+            )
         except (AnalysisError, OSError, ValueError) as error:
             logger.error("Summary PDF generation failed (%s)", type(error).__name__)
             return JsonResponse({"message": "Nepavyko sukurti santraukos."}, status=500)

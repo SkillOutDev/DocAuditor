@@ -51,7 +51,8 @@ class AnalysisTests(TestCase):
         token = client.get(reverse("csrf")).cookies["csrftoken"].value
         with patch("api.views.analysis.extract_document_text", return_value="Sąlygos"), \
              patch("api.views.analysis.generate_summary", return_value="Santrauka"), \
-             patch("api.views.analysis.generate_risk_assessment", return_value=[]):
+             patch("api.views.analysis.generate_risk_assessment", return_value=[]), \
+             patch("api.views.analysis.generate_privacy_assessment", return_value={}):
             self.assertEqual(client.post(self.url, HTTP_X_CSRFTOKEN=token).status_code, 200)
 
     def test_summary_is_only_saved_after_explicit_save_and_downloaded_as_readable_pdf(self):
@@ -62,12 +63,22 @@ class AnalysisTests(TestCase):
             "explanation": "Klientui gali tekti mokėti papildomus mokesčius.",
             "clause": "5.2 punktas",
         }]
+        privacy = {
+            "collected_data": "Vardas ir el. paštas",
+            "purposes": "Sutarties vykdymas",
+            "retention": "5 metus",
+            "third_parties": "Partneriams",
+            "eea_transfer": True,
+            "marketing_without_consent": False,
+            "summary": "Duomenys perduodami partneriams.",
+        }
         with patch("api.views.analysis.extract_document_text", return_value="Sąlygos"), \
              patch("api.views.analysis.generate_summary", return_value="Sąlygos: įmoka ąčęėįšųūž."), \
-             patch("api.views.analysis.generate_risk_assessment", return_value=risks):
+             patch("api.views.analysis.generate_risk_assessment", return_value=risks), \
+             patch("api.views.analysis.generate_privacy_assessment", return_value=privacy):
             response = self.client.post(self.url)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"summary": "Sąlygos: įmoka ąčęėįšųūž.", "risks": risks})
+        self.assertEqual(response.json(), {"summary": "Sąlygos: įmoka ąčęėįšųūž.", "risks": risks, "privacy": privacy})
         self.document.refresh_from_db()
         self.assertEqual(self.document.simplified_explanation, "")
         self.assertEqual(self.client.get(self.pdf_url).status_code, 404)
@@ -78,6 +89,7 @@ class AnalysisTests(TestCase):
         self.assertEqual(self.document.analysis_status, Document.AnalysisStatus.COMPLETED)
         self.assertEqual(self.document.simplified_explanation, "Sąlygos: įmoka ąčęėįšųūž.")
         self.assertEqual(self.document.risk_assessment, risks)
+        self.assertEqual(self.document.privacy_assessment, privacy)
         listed = self.client.get(reverse("documents")).json()["documents"][0]
         self.assertEqual(listed["simplified_explanation"], self.document.simplified_explanation)
         response = self.client.get(self.pdf_url)
@@ -89,6 +101,9 @@ class AnalysisTests(TestCase):
         self.assertIn("Nustatytos rizikos ir grėsmės", pdf_text)
         self.assertIn("Didelė rizika", pdf_text)
         self.assertIn("5.2 punktas", pdf_text)
+        self.assertIn("Asmens duomenų apsauga ir privatumas", pdf_text)
+        self.assertIn("Vardas ir el. paštas", pdf_text)
+        self.assertIn("už ES/EEE ribų", pdf_text)
 
     def test_failure_does_not_destroy_previous_summary(self):
         self.document.simplified_explanation = "Ankstesnė santrauka"
@@ -128,7 +143,8 @@ class AnalysisTests(TestCase):
         with patch("api.views.analysis.extract_document_text", return_value="Sąlygos"), \
              patch("api.analysis.get_gemini_provider", side_effect=MissingGeminiAPIKey), \
              patch("api.analysis.OllamaProvider", return_value=ollama), \
-             patch("api.views.analysis.generate_risk_assessment", return_value=[]):
+             patch("api.views.analysis.generate_risk_assessment", return_value=[]), \
+             patch("api.views.analysis.generate_privacy_assessment", return_value={}):
             response = self.client.post(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["summary"], summary.strip())

@@ -41,6 +41,7 @@ class Document(models.Model):
     )
     simplified_explanation = models.TextField(blank=True)
     risk_assessment = models.JSONField(default=list, blank=True)
+    privacy_assessment = models.JSONField(default=dict, blank=True)
     key_conditions = models.JSONField(default=list, blank=True)
     analysis_error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
