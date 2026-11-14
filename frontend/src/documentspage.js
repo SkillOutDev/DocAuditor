@@ -2,39 +2,41 @@ import './style.css';
 import { initializeThemeToggle } from './theme.js';
 
 document.querySelector('#app').innerHTML = `
-  <main class="min-h-screen px-6 py-12">
+  <main class="min-h-screen px-6 py-3">
     <section class="mx-auto max-w-4xl">
-      <header class="mb-8 flex items-center justify-between gap-4">
-        <div>
-          <p class="text-sm font-semibold uppercase tracking-[0.3em] text-pacific-blue-400">DocAuditor</p>
-          <h1 class="mt-2 text-3xl font-bold tracking-tight text-alabaster-grey-50">Mano dokumentai</h1>
-        </div>
+      <header class="mb-3 flex items-center justify-between gap-4">
+        <p class="text-sm font-semibold uppercase tracking-[0.3em] text-pacific-blue-400">DocAuditor</p>
         <button id="logout-button" type="button"
           class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">
           Atsijungti
         </button>
       </header>
-      <div class="mb-6 rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-6 shadow-2xl shadow-black/20">
-        <h2 class="text-lg font-semibold text-alabaster-grey-50">Įkelti dokumentą</h2>
-        <form id="upload-form" novalidate class="mt-4">
-          <input id="file-input" name="file" type="file" accept=".pdf,.doc,.docx" class="hidden" />
-          <div class="flex flex-wrap items-center gap-3">
-            <button id="choose-button" type="button"
-              class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">
-              Įkelti dokumentą
-            </button>
-            <span id="file-name" class="text-sm text-powder-blue-400">Failas nepasirinktas</span>
-          </div>
-          <p class="mt-2 text-xs text-powder-blue-500">Leidžiami PDF, DOC ir DOCX failai iki 15 MB.</p>
-          <p id="upload-message" class="mt-3 min-h-5 text-sm font-medium" aria-live="polite"></p>
-          <button id="save-button" type="submit"
-            class="mt-2 rounded-xl bg-pacific-blue-500 px-5 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 disabled:cursor-not-allowed disabled:opacity-50">
-            Išsaugoti
-          </button>
-        </form>
-      </div>
       <div class="rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950/70 p-6 shadow-2xl shadow-black/20">
-        <form id="documents-filter-form" class="mb-5 grid gap-3 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+        <h1 class="mb-4 text-xl font-bold tracking-tight text-alabaster-grey-50">Mano dokumentai</h1>
+        <div class="mb-5 border-b border-charcoal-blue-700/80 pb-5">
+          <form id="upload-form" novalidate>
+            <input id="file-input" name="file" type="file" accept=".pdf,.doc,.docx" class="hidden" />
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-40">
+                <h2 class="text-base font-semibold text-alabaster-grey-50">Įkelti dokumentą</h2>
+                <p class="mt-0.5 text-xs text-powder-blue-500">PDF, DOC arba DOCX iki 15 MB</p>
+              </div>
+              <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-3">
+                <button id="choose-button" type="button"
+                  class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">
+                  Pasirinkti failą
+                </button>
+                <span id="file-name" class="min-w-32 truncate text-sm text-powder-blue-400">Failas nepasirinktas</span>
+                <button id="save-button" type="submit"
+                  class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 disabled:cursor-not-allowed disabled:opacity-50">
+                  Išsaugoti
+                </button>
+              </div>
+            </div>
+            <p id="upload-message" class="mt-1 text-sm font-medium" aria-live="polite"></p>
+          </form>
+        </div>
+        <form id="documents-filter-form" class="mb-0 grid gap-3 border-b border-charcoal-blue-700/80 pb-3 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <label class="block">
             <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Pavadinimas</span>
             <div class="relative">
@@ -63,17 +65,19 @@ document.querySelector('#app').innerHTML = `
             </select>
           </label>
           <label class="block">
-            <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Kryptis</span>
+            <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Eiliškumas</span>
             <select id="sort-direction" class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-3 py-2 text-sm text-alabaster-grey-50 outline-none transition focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20">
               <option value="asc">Didėjimo</option>
               <option value="desc">Mažėjimo</option>
             </select>
           </label>
-          <button id="apply-filters-button" type="submit" class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">Filtruoti</button>
-          <button id="clear-filters-button" type="button" class="rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">Išvalyti</button>
+          <div class="flex justify-end gap-3 md:col-span-5">
+            <button id="clear-filters-button" type="button" class="self-start rounded-xl border border-charcoal-blue-600 px-4 py-2 text-sm font-semibold text-alabaster-grey-50 transition hover:border-pacific-blue-400">Išvalyti</button>
+            <button id="apply-filters-button" type="submit" class="self-start rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">Filtruoti</button>
+          </div>
         </form>
-        <p id="documents-status" class="text-sm text-powder-blue-400" aria-live="polite">Kraunama...</p>
-        <p id="documents-message" class="mb-2 min-h-5 text-sm font-medium" aria-live="polite"></p>
+        <p id="documents-status" class="text-sm text-powder-blue-400 empty:hidden" aria-live="polite">Kraunama...</p>
+        <p id="documents-message" class="mb-2 text-sm font-medium empty:hidden" aria-live="polite"></p>
         <ul id="documents-list" class="divide-y divide-charcoal-blue-700/80"></ul>
       </div>
     </section>
@@ -92,7 +96,7 @@ document.querySelector('#app').innerHTML = `
               Analizuoti
             </button>
             <button id="ask-document-button" type="button" class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 transition hover:bg-pacific-blue-400 focus:outline-none focus:ring-2 focus:ring-pacific-blue-300">
-              Paklausk apie dokumentą
+              Klausti
             </button>
             <button id="compare-documents-button" type="button" class="rounded-xl border border-pacific-blue-400 px-4 py-2 text-sm font-semibold text-pacific-blue-300 transition hover:bg-pacific-blue-400/10">
               Palyginti
