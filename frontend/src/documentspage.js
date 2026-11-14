@@ -112,7 +112,12 @@ document.querySelector('#app').innerHTML = `
         <div class="max-h-52 overflow-y-auto border-b border-charcoal-blue-700/80 px-5 py-3 text-sm text-powder-blue-300">
           <p id="analysis-status" class="mt-2" aria-live="polite"></p>
           <p id="analysis-summary" class="mt-2 whitespace-pre-wrap text-alabaster-grey-50"></p>
-          <a id="analysis-download" class="mt-2 hidden font-semibold text-pacific-blue-300" download>Gauti santrauką</a>
+          <div class="mt-2 flex items-center justify-end gap-3">
+            <a id="analysis-download" class="hidden font-semibold text-pacific-blue-300" download>Gauti santrauką</a>
+            <button id="save-analysis-button" type="button" class="hidden rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 disabled:opacity-50">
+              Išsaugoti analizę
+            </button>
+          </div>
         </div>
         <p id="preview-status" class="hidden px-5 py-4 text-sm text-powder-blue-400" aria-live="polite"></p>
         <iframe id="preview-frame" title="Dokumento turinio peržiūra" class="hidden min-h-0 flex-1 bg-white"></iframe>
@@ -187,8 +192,10 @@ const previewDeleteButton = document.querySelector('#preview-delete-button');
 const analyzeButton = document.querySelector('#analyze-button');
 const analysisStatus = document.querySelector('#analysis-status');
 const analysisSummary = document.querySelector('#analysis-summary');
+const saveAnalysisButton = document.querySelector('#save-analysis-button');
 const analysisDownload = document.querySelector('#analysis-download');
 const analyzingDocuments = new Set();
+const generatedAnalyses = new Map();
 const askDocumentButton = document.querySelector('#ask-document-button');
 const compareDocumentsButton = document.querySelector('#compare-documents-button');
 const chatDialog = document.querySelector('#chat-dialog');
@@ -215,12 +222,30 @@ let previewDocument = null;
 let pendingDeleteDocument = null;
 let chatDocument = null;
 let comparisonObjectUrl = '';
+let analysisStatusTimeout = null;
 const DELETE_SUCCESS = 'Dokumentas sėkmingai ištrintas';
 const DELETE_FAILED = 'Klaida: nepavyko ištrinti dokumento';
 
 function showDocumentsMessage(text, colorClass) {
   documentsMessage.textContent = text;
   documentsMessage.className = `mb-2 min-h-5 text-sm font-medium ${colorClass}`;
+}
+
+function clearAnalysisStatus() {
+  if (analysisStatusTimeout) {
+    clearTimeout(analysisStatusTimeout);
+    analysisStatusTimeout = null;
+  }
+  analysisStatus.textContent = '';
+}
+
+function showAnalysisSuccess(documentId) {
+  clearAnalysisStatus();
+  analysisStatus.textContent = 'Analizė sėkmingai išsaugota';
+  analysisStatusTimeout = setTimeout(() => {
+    if (previewDocument?.id === documentId) analysisStatus.textContent = '';
+    analysisStatusTimeout = null;
+  }, 5000);
 }
 
 function renderComparisonReport(report) {
@@ -317,6 +342,7 @@ function closeComparison() {
 }
 
 async function openDocumentPreview(document_) {
+  clearAnalysisStatus();
   previewDocument = document_;
   renderAnalysis(document_);
   previewDialog.classList.remove('hidden');
@@ -359,9 +385,16 @@ async function openDocumentPreview(document_) {
 
 function renderAnalysis(document_) {
   const analyzing = analyzingDocuments.has(document_.id);
+  const generatedSummary = generatedAnalyses.get(document_.id);
+  const summary = generatedSummary || document_.simplified_explanation || '';
   analyzeButton.disabled = analyzing;
-  analysisStatus.textContent = analyzing ? 'Dokumentas analizuojamas...' : '';
-  analysisSummary.textContent = document_.simplified_explanation || '';
+  if (analyzing) {
+    analysisStatus.textContent = 'Dokumentas analizuojamas...';
+  } else if (analysisStatus.textContent === 'Dokumentas analizuojamas...') {
+    analysisStatus.textContent = '';
+  }
+  analysisSummary.textContent = summary;
+  saveAnalysisButton.classList.toggle('hidden', !generatedSummary);
   analysisDownload.classList.toggle('hidden', !document_.simplified_explanation);
   analysisDownload.href = `/api/documents/${document_.id}/summary.pdf`;
 }
@@ -383,8 +416,8 @@ analyzeButton.addEventListener('click', async () => {
     }
     if (!response.ok) throw new Error('Analysis request failed');
     const result = await response.json();
-    document_.simplified_explanation = result.summary;
-    if (previewDocument?.id === document_.id) analysisSummary.textContent = result.summary;
+    generatedAnalyses.set(document_.id, result.summary);
+    if (previewDocument?.id === document_.id) renderAnalysis(document_);
   } catch {
     if (previewDocument?.id === document_.id) analysisStatus.textContent = 'Analizė nepavyko, bandykite dar kartą';
   } finally {
@@ -392,8 +425,39 @@ analyzeButton.addEventListener('click', async () => {
     if (previewDocument?.id === document_.id) {
       analyzeButton.disabled = false;
       if (analysisStatus.textContent === 'Dokumentas analizuojamas...') analysisStatus.textContent = '';
-      analysisDownload.classList.toggle('hidden', !document_.simplified_explanation);
+      if (previewDocument?.id === document_.id) renderAnalysis(document_);
     }
+  }
+});
+
+saveAnalysisButton.addEventListener('click', async () => {
+  const document_ = previewDocument;
+  const summary = document_ && generatedAnalyses.get(document_.id);
+  if (!document_ || !summary) return;
+  saveAnalysisButton.disabled = true;
+  try {
+    const response = await fetch(`/api/documents/${document_.id}/analysis/save/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': await getCsrfToken(),
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ summary }),
+    });
+    if (response.status === 401) {
+      window.location.replace('/login');
+      return;
+    }
+    if (!response.ok) throw new Error('Analysis save request failed');
+    document_.simplified_explanation = summary;
+    generatedAnalyses.delete(document_.id);
+    renderAnalysis(document_);
+    showAnalysisSuccess(document_.id);
+  } catch {
+    analysisStatus.textContent = 'Nepavyko išsaugoti analizės, bandykite dar kartą';
+  } finally {
+    saveAnalysisButton.disabled = false;
   }
 });
 

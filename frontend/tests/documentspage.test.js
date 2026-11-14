@@ -243,7 +243,7 @@ describe('documents page', () => {
       URL.revokeObjectURL = vi.fn();
     });
 
-    it('shows progress, then the summary and PDF download', async () => {
+    it('shows progress, then an unsaved summary and save button', async () => {
       let finish;
       const pending = new Promise((resolve) => { finish = resolve; });
       await loadPage({
@@ -263,9 +263,75 @@ describe('documents page', () => {
       finish(json({ summary: 'Svarbiausios sąlygos.' }));
       await flush();
       expect($('#analysis-summary').textContent).toBe('Svarbiausios sąlygos.');
-      expect($('#analysis-download').getAttribute('href')).toBe('/api/documents/1/summary.pdf');
-      expect($('#analysis-download').classList.contains('hidden')).toBe(false);
+      expect($('#save-analysis-button').classList.contains('hidden')).toBe(false);
+      expect($('#analysis-download').classList.contains('hidden')).toBe(true);
       expect($('#analyze-button').disabled).toBe(false);
+    });
+
+    it('saves the generated summary and shows a success message', async () => {
+      let saveOptions;
+      await loadPage({
+        ...baseRoutes(),
+        'GET /api/documents/1/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+        'POST /api/documents/1/analysis/': () => json({ summary: 'Svarbiausios sąlygos.' }),
+        'POST /api/documents/1/analysis/save/': (options) => {
+          saveOptions = options;
+          return json({ message: 'Analizė sėkmingai išsaugota', summary: 'Svarbiausios sąlygos.' });
+        },
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#analyze-button').click();
+      await flush();
+      vi.useFakeTimers();
+      $('#save-analysis-button').click();
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      expect(saveOptions.headers['X-CSRFToken']).toBe('token123');
+      expect(JSON.parse(saveOptions.body)).toEqual({ summary: 'Svarbiausios sąlygos.' });
+      expect($('#analysis-status').textContent).toBe('Analizė sėkmingai išsaugota');
+      expect($('#save-analysis-button').classList.contains('hidden')).toBe(true);
+      expect($('#analysis-download').classList.contains('hidden')).toBe(false);
+      await vi.advanceTimersByTimeAsync(5000);
+      expect($('#analysis-status').textContent).toBe('');
+      vi.useRealTimers();
+    });
+
+    it('reports save failures and keeps the summary available for retrying', async () => {
+      await loadPage({
+        ...baseRoutes(),
+        'GET /api/documents/1/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+        'POST /api/documents/1/analysis/': () => json({ summary: 'Svarbiausios sąlygos.' }),
+        'POST /api/documents/1/analysis/save/': () => json({}, 500),
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#analyze-button').click();
+      await flush();
+      $('#save-analysis-button').click();
+      await flush();
+      expect($('#analysis-status').textContent).toBe('Nepavyko išsaugoti analizės, bandykite dar kartą');
+      expect($('#save-analysis-button').classList.contains('hidden')).toBe(false);
+    });
+
+    it('clears the save success message when another document opens', async () => {
+      const secondDocument = { id: 2, original_filename: 'kita-sutartis.pdf', created_at: '2026-01-03T10:00:00Z' };
+      await loadPage({
+        ...baseRoutes([doc, secondDocument]),
+        'GET /api/documents/1/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+        'GET /api/documents/2/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+        'POST /api/documents/1/analysis/': () => json({ summary: 'Svarbiausios sąlygos.' }),
+        'POST /api/documents/1/analysis/save/': () => json({ message: 'Analizė sėkmingai išsaugota' }),
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#analyze-button').click();
+      await flush();
+      $('#save-analysis-button').click();
+      await flush();
+      expect($('#analysis-status').textContent).toBe('Analizė sėkmingai išsaugota');
+      $('[data-document-id="2"]').click();
+      await flush();
+      expect($('#analysis-status').textContent).toBe('');
     });
 
     it('reports analysis failures and allows retrying', async () => {

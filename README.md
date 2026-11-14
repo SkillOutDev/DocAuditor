@@ -171,13 +171,14 @@ Ollama atveju atskirai įdiekite Ollama ir atsisiųskite pasirinktą modelį, pa
 ollama pull llama3.2
 ```
 
-## Bendroji dokumento analizė (US-9)
+## Bendroji dokumento analizė (US-9, US-17)
 
 Prisijungę atidarykite savo dokumentą ir pasirinkite „Analizuoti“. Dokumento
 tekstas pirmiausia siunčiamas į „Gemini“ (Google); jei užklausa nepavyksta arba
 grąžina tuščią ar ilgesnę nei 700 simbolių santrauką, naudojamas vietinis
-„Ollama“. Santrauka išsaugoma kartu su dokumento metaduomenimis. Mygtukas
-„Gauti santrauką“ atsisiunčia ją PDF formatu.
+„Ollama“. Sugeneruota santrauka iš pradžių rodoma tik naudotojui; ji išsaugoma
+kartu su dokumento metaduomenimis tik paspaudus „Išsaugoti analizę“. Mygtukas
+„Gauti santrauką“ atsisiunčia išsaugotą santrauką PDF formatu.
 
 „Ollama“ santraukos riba yra 2000 simbolių, todėl jos gali viršyti pradiniame
 US-9 reikalavime numatytą 700 simbolių ribą. „Gemini“ riba išlieka 700.
@@ -214,6 +215,9 @@ PDF santraukai naudojamas sistemos Unicode šriftas (Windows Arial arba Linux
 DejaVu Sans); jei jo nėra, nustatykite `SUMMARY_PDF_FONT` į TTF failo kelią.
 Analizė yra DI sugeneruota ir nėra garantuotai teisingas teisinis vertinimas.
 
-API: `POST /api/documents/<id>/analysis/` grąžina `{"summary": "..."}`, o
-`GET /api/documents/<id>/summary.pdf` grąžina PDF. Abu prieinami tik dokumento
-savininkui; POST užklausai būtina sesija ir CSRF žetonas.
+API: `POST /api/documents/<id>/analysis/` grąžina `{"summary": "..."}`,
+bet santraukos neišsaugo. `POST /api/documents/<id>/analysis/save/` su
+`{"summary": "..."}` išsaugo santrauką, o
+`GET /api/documents/<id>/summary.pdf` grąžina išsaugotą PDF. Šie veiksmai
+prieinami tik dokumento savininkui; POST užklausoms būtina sesija ir CSRF
+žetonas.

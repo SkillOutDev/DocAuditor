@@ -32,13 +32,16 @@ class AnalysisTests(TestCase):
             file=SimpleUploadedFile("contract.pdf", b"not a pdf"), file_size=9,
         )
         self.url = reverse("document-analysis", args=[self.document.pk])
+        self.save_url = reverse("document-analysis-save", args=[self.document.pk])
         self.pdf_url = reverse("document-summary-pdf", args=[self.document.pk])
 
     def test_analysis_and_download_require_owner(self):
         self.assertEqual(self.client.post(self.url).status_code, 401)
+        self.assertEqual(self.client.post(self.save_url).status_code, 401)
         self.assertEqual(self.client.get(self.pdf_url).status_code, 401)
         self.client.force_login(self.other)
         self.assertEqual(self.client.post(self.url).status_code, 404)
+        self.assertEqual(self.client.post(self.save_url).status_code, 404)
         self.assertEqual(self.client.get(self.pdf_url).status_code, 404)
 
     def test_analysis_requires_csrf(self):
@@ -50,12 +53,19 @@ class AnalysisTests(TestCase):
              patch("api.views.analysis.generate_summary", return_value="Santrauka"):
             self.assertEqual(client.post(self.url, HTTP_X_CSRFTOKEN=token).status_code, 200)
 
-    def test_summary_is_saved_and_downloaded_as_readable_pdf(self):
+    def test_summary_is_only_saved_after_explicit_save_and_downloaded_as_readable_pdf(self):
         self.client.force_login(self.owner)
         with patch("api.views.analysis.extract_document_text", return_value="Sąlygos"), \
              patch("api.views.analysis.generate_summary", return_value="Sąlygos: įmoka ąčęėįšųūž."):
             response = self.client.post(self.url)
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"summary": "Sąlygos: įmoka ąčęėįšųūž."})
+        self.document.refresh_from_db()
+        self.assertEqual(self.document.simplified_explanation, "")
+        self.assertEqual(self.client.get(self.pdf_url).status_code, 404)
+        response = self.client.post(self.save_url, data=json.dumps(response.json()), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "Analizė sėkmingai išsaugota")
         self.document.refresh_from_db()
         self.assertEqual(self.document.analysis_status, Document.AnalysisStatus.COMPLETED)
         self.assertEqual(self.document.simplified_explanation, "Sąlygos: įmoka ąčęėįšųūž.")
@@ -84,7 +94,7 @@ class AnalysisTests(TestCase):
         self.client.force_login(self.owner)
         self.assertEqual(self.client.get(self.pdf_url).status_code, 404)
 
-    def test_long_ollama_summary_is_saved_and_downloadable(self):
+    def test_long_ollama_summary_is_saved_and_downloadable_after_explicit_save(self):
         self.client.force_login(self.owner)
         summary = "Sąlygos ir mokėjimas. " * 90
         self.assertTrue(700 < len(summary.strip()) <= 2000)
@@ -97,11 +107,29 @@ class AnalysisTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["summary"], summary.strip())
         self.document.refresh_from_db()
+        self.assertEqual(self.document.simplified_explanation, "")
+        self.client.post(
+            self.save_url,
+            data=json.dumps(response.json()),
+            content_type="application/json",
+        )
+        self.document.refresh_from_db()
         self.assertEqual(self.document.simplified_explanation, summary.strip())
         response = self.client.get(self.pdf_url)
         self.assertEqual(response.status_code, 200)
         reader = PdfReader(BytesIO(b"".join(response.streaming_content)))
         self.assertIn("Sąlygos ir mokėjimas.", reader.pages[0].extract_text())
+
+    def test_save_requires_a_non_empty_summary(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            self.save_url,
+            data=json.dumps({"summary": " "}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.document.refresh_from_db()
+        self.assertEqual(self.document.simplified_explanation, "")
 
     def test_api_schema_documents_analysis_and_pdf(self):
         response = self.client.get("/api/schema/", HTTP_ACCEPT="application/vnd.oai.openapi+json")

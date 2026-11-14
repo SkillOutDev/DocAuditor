@@ -7,12 +7,13 @@ from .documents import (
     preview_document,
 )
 from .health import health
-from .analysis import DocumentAnalysisView, DocumentSummaryPDFView
+from .analysis import DocumentAnalysisSaveView, DocumentAnalysisView, DocumentSummaryPDFView
 
 __all__ = [
     "DocumentCollectionView",
     "DocumentDetailView",
     "DocumentAnalysisView",
+    "DocumentAnalysisSaveView",
     "DocumentSummaryPDFView",
     "ask_document_question",
     "compare_document_versions",

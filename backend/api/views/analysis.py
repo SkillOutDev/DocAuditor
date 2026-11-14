@@ -1,4 +1,5 @@
 import logging
+import json
 from io import BytesIO
 
 from django.http import FileResponse, JsonResponse
@@ -28,6 +29,18 @@ class AnalysisResponseSerializer(Serializer):
     )
 
 
+class SaveAnalysisRequestSerializer(Serializer):
+    summary = CharField(
+        max_length=OLLAMA_MAX_SUMMARY_LENGTH,
+        allow_blank=False,
+    )
+
+
+class SaveAnalysisResponseSerializer(Serializer):
+    message = CharField()
+    summary = CharField(max_length=OLLAMA_MAX_SUMMARY_LENGTH)
+
+
 class DocumentAnalysisView(APIView):
     permission_classes = [ManualDocumentAuthenticationPermission]
 
@@ -54,11 +67,51 @@ class DocumentAnalysisView(APIView):
             summary = generate_summary(text)
         except AnalysisError:
             return JsonResponse({"message": FAILURE_MESSAGE}, status=502)
+        return JsonResponse({"summary": summary})
+
+
+class DocumentAnalysisSaveView(APIView):
+    permission_classes = [ManualDocumentAuthenticationPermission]
+
+    @extend_schema(
+        operation_id="save_document_analysis",
+        summary="Save a generated document analysis",
+        request=SaveAnalysisRequestSerializer,
+        responses={200: SaveAnalysisResponseSerializer,
+                   400: DocumentErrorResponseSerializer,
+                   401: DocumentErrorResponseSerializer,
+                   404: DocumentErrorResponseSerializer},
+    )
+    def post(self, request, document_id):
+        if not request.user.is_authenticated:
+            return JsonResponse(
+                {"message": "Norėdami išsaugoti analizę, prisijunkite."},
+                status=401,
+            )
+        document = Document.objects.filter(pk=document_id, owner=request.user).first()
+        if document is None:
+            return JsonResponse({"message": "Dokumento rasti nepavyko."}, status=404)
+        try:
+            payload = json.loads(request.body or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+        summary = payload.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
+            return JsonResponse(
+                {"message": "Analizės išsaugoti nepavyko.", "errors": {"summary": "Santrauka negali būti tuščia."}},
+                status=400,
+            )
+        summary = summary.strip()
+        if len(summary) > OLLAMA_MAX_SUMMARY_LENGTH:
+            return JsonResponse(
+                {"message": "Analizės išsaugoti nepavyko.", "errors": {"summary": "Santrauka per ilga."}},
+                status=400,
+            )
         document.simplified_explanation = summary
         document.analysis_status = Document.AnalysisStatus.COMPLETED
         document.analysis_error = ""
         document.save(update_fields=["simplified_explanation", "analysis_status", "analysis_error", "updated_at"])
-        return JsonResponse({"summary": summary})
+        return JsonResponse({"message": "Analizė sėkmingai išsaugota", "summary": summary})
 
 
 class DocumentSummaryPDFView(APIView):
