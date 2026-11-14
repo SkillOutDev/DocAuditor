@@ -81,15 +81,15 @@ document.querySelector('#app').innerHTML = `
         <ul id="documents-list" class="divide-y divide-charcoal-blue-700/80"></ul>
       </div>
     </section>
-    <div id="preview-dialog" class="fixed inset-0 z-10 hidden bg-carbon-black-950/80 p-4 sm:p-8" role="dialog" aria-modal="true" aria-labelledby="preview-title">
-      <section class="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 shadow-2xl">
+    <div id="preview-dialog" class="fixed inset-0 z-10 hidden bg-carbon-black-950/80 p-4 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+      <section class="mx-auto flex h-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 shadow-2xl">
         <header class="flex items-center justify-between gap-4 border-b border-charcoal-blue-700/80 px-5 py-4">
           <div class="flex min-w-0 items-baseline gap-2">
             <h2 id="preview-title" class="truncate text-lg font-semibold text-alabaster-grey-50">Dokumento peržiūra</h2>
             <span id="preview-date" class="shrink-0 text-sm text-powder-blue-400"></span>
           </div>
           <div class="flex items-center gap-2">
-            <button id="preview-delete-button" type="button" class="rounded-xl border border-rose-400/70 px-4 py-2 text-sm font-semibold text-rose-300 transition hover:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300">
+            <button id="preview-delete-button" type="button" class="rounded-xl border border-rose-400/70 px-4 py-2 text-sm font-semibold text-rose-500 transition hover:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300">
               Ištrinti
             </button>
             <button id="analyze-button" type="button" class="rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 disabled:opacity-50">
@@ -127,22 +127,26 @@ document.querySelector('#app').innerHTML = `
             </section>
           </div>
         </header>
-        <div class="max-h-52 overflow-y-auto border-b border-charcoal-blue-700/80 px-5 py-3 text-sm text-powder-blue-300">
-          <p id="analysis-status" class="mt-2" aria-live="polite"></p>
-          <p id="analysis-summary" class="mt-2 whitespace-pre-wrap text-alabaster-grey-50"></p>
-          <div id="analysis-risks" class="mt-3 hidden"></div>
-          <div id="analysis-privacy" class="mt-3 hidden"></div>
-          <div class="mt-2 flex items-center justify-end gap-3">
-            <a id="analysis-download" class="hidden font-semibold text-pacific-blue-300" download>Gauti santrauką</a>
-            <button id="save-analysis-button" type="button" class="hidden rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 disabled:opacity-50">
-              Išsaugoti analizę
-            </button>
+        <div id="analysis-layout" class="grid min-h-0 flex-1 lg:grid-cols-1">
+          <div id="analysis-panel" class="min-h-0 max-h-[45vh] overflow-y-auto border-b border-charcoal-blue-700/80 px-5 py-3 text-sm text-powder-blue-300 lg:max-h-none lg:border-b-0 lg:border-r">
+            <p id="analysis-status" class="mt-2" aria-live="polite"></p>
+            <p id="analysis-summary" class="mt-2 whitespace-pre-wrap text-alabaster-grey-50"></p>
+            <div id="analysis-risks" class="mt-3 hidden"></div>
+            <div id="analysis-privacy" class="mt-3 hidden"></div>
+            <div class="mt-2 flex items-center justify-end gap-3">
+              <a id="analysis-download" class="hidden font-semibold text-pacific-blue-300" download>Gauti santrauką</a>
+              <button id="save-analysis-button" type="button" class="hidden rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 disabled:opacity-50">
+                Išsaugoti analizę
+              </button>
+            </div>
           </div>
-        </div>
-        <p id="preview-status" class="hidden px-5 py-4 text-sm text-powder-blue-400" aria-live="polite"></p>
-        <iframe id="preview-frame" title="Dokumento turinio peržiūra" class="hidden min-h-0 flex-1 bg-white"></iframe>
-        <div id="preview-download" class="hidden px-5 pb-5 text-sm text-powder-blue-400">
-          <a id="preview-download-link" class="font-semibold text-pacific-blue-300 hover:text-pacific-blue-200" download>Atsisiųsti dokumentą</a>
+          <div class="flex min-h-0 flex-col">
+            <p id="preview-status" class="hidden px-5 py-4 text-sm text-powder-blue-400" aria-live="polite"></p>
+            <iframe id="preview-frame" title="Dokumento turinio peržiūra" class="hidden min-h-0 flex-1 bg-white"></iframe>
+            <div id="preview-download" class="hidden px-5 pb-5 text-sm text-powder-blue-400">
+              <a id="preview-download-link" class="font-semibold text-pacific-blue-300 hover:text-pacific-blue-200" download>Atsisiųsti dokumentą</a>
+            </div>
+          </div>
         </div>
       </section>
     </div>
@@ -169,7 +173,7 @@ document.querySelector('#app').innerHTML = `
     <div id="delete-dialog" class="fixed inset-0 z-20 hidden items-center justify-center bg-carbon-black-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title" aria-describedby="delete-dialog-message">
       <section class="w-full max-w-md rounded-2xl border border-charcoal-blue-700/80 bg-charcoal-blue-950 p-6 shadow-2xl shadow-black/40">
         <div class="flex items-start gap-4">
-          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-400/10 text-rose-300" aria-hidden="true">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-400/10 text-rose-500" aria-hidden="true">
             <span class="text-xl">!</span>
           </div>
           <div>
@@ -214,6 +218,8 @@ const previewDeleteButton = document.querySelector('#preview-delete-button');
 const analyzeButton = document.querySelector('#analyze-button');
 const analysisStatus = document.querySelector('#analysis-status');
 const analysisSummary = document.querySelector('#analysis-summary');
+const analysisLayout = document.querySelector('#analysis-layout');
+const analysisPanel = document.querySelector('#analysis-panel');
 const analysisRisks = document.querySelector('#analysis-risks');
 const analysisPrivacy = document.querySelector('#analysis-privacy');
 const saveAnalysisButton = document.querySelector('#save-analysis-button');
@@ -275,9 +281,9 @@ function showAnalysisSuccess(documentId) {
 function renderComparisonReport(report) {
   comparisonReport.replaceChildren();
   const differenceStyles = {
-    'PRIDĖTA': ['text-emerald-300', 'added'],
-    'PAŠALINTA': ['text-rose-300', 'removed'],
-    'PAKEISTA': ['text-yellow-300', 'changed'],
+    'PRIDĖTA': ['text-emerald-600', 'added'],
+    'PAŠALINTA': ['text-rose-500', 'removed'],
+    'PAKEISTA': ['text-yellow-500', 'changed'],
   };
 
   const lines = report.split('\n');
@@ -351,7 +357,7 @@ function openComparison() {
     secondVersionSelect.value = String(versions[versions.length - 1].id);
   }
   comparisonMessage.textContent = versions.length < 2 ? 'Nepasirinkti dokumentai palyginimui' : '';
-  comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-300';
+  comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-500';
   comparisonReport.classList.add('hidden');
   comparisonDownloadContainer.replaceChildren();
   if (comparisonObjectUrl) {
@@ -419,6 +425,10 @@ function renderAnalysis(document_) {
   const summary = generatedAnalysis?.summary || document_.simplified_explanation || '';
   const risks = generatedAnalysis?.risks || document_.risk_assessment || [];
   const privacy = generatedAnalysis?.privacy || document_.privacy_assessment || {};
+  const hasAnalysis = Boolean(summary || generatedAnalysis);
+  analysisPanel.classList.toggle('hidden', !hasAnalysis);
+  analysisLayout.classList.toggle('lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]', hasAnalysis);
+  analysisLayout.classList.toggle('lg:grid-cols-1', !hasAnalysis);
   analyzeButton.disabled = analyzing;
   if (analyzing) {
     analysisStatus.textContent = 'Dokumentas analizuojamas...';
@@ -426,8 +436,8 @@ function renderAnalysis(document_) {
     analysisStatus.textContent = '';
   }
   analysisSummary.textContent = summary;
-  renderRisks(risks, Boolean(summary || generatedAnalysis));
-  renderPrivacy(privacy, Boolean(summary || generatedAnalysis));
+  renderRisks(risks, hasAnalysis);
+  renderPrivacy(privacy, hasAnalysis);
   saveAnalysisButton.classList.toggle('hidden', !generatedAnalysis);
   analysisDownload.classList.toggle('hidden', !document_.simplified_explanation);
   analysisDownload.href = `/api/documents/${document_.id}/summary.pdf`;
@@ -437,6 +447,7 @@ function renderPrivacy(privacy, hasAnalysis) {
   analysisPrivacy.replaceChildren();
   analysisPrivacy.classList.toggle('hidden', !hasAnalysis);
   if (!hasAnalysis) return;
+  analysisPrivacy.className = 'mt-3';
 
   const heading = document.createElement('h3');
   heading.className = 'font-semibold text-alabaster-grey-50';
@@ -448,27 +459,36 @@ function renderPrivacy(privacy, hasAnalysis) {
     ['Saugojimo terminas', privacy.retention],
     ['Perdavimas trečiosioms šalims / partneriams', privacy.third_parties],
   ];
+  const fieldList = document.createElement('div');
+  fieldList.className = 'mt-2 space-y-3';
   for (const [label, value] of fields) {
-    const item = document.createElement('p');
-    item.className = 'mt-1';
-    item.append(`${label}: ${value || 'Nenurodyta'}`);
-    analysisPrivacy.append(item);
+    const item = document.createElement('article');
+    item.className = 'rounded-lg border border-charcoal-blue-700/80 p-3';
+    const itemLabel = document.createElement('p');
+    itemLabel.className = 'font-semibold text-powder-blue-200';
+    itemLabel.textContent = label;
+    const itemValue = document.createElement('p');
+    itemValue.className = 'mt-1 text-powder-blue-300';
+    itemValue.textContent = value || 'Nenurodyta';
+    item.append(itemLabel, itemValue);
+    fieldList.append(item);
   }
+  analysisPrivacy.append(fieldList);
   if (privacy.eea_transfer) {
     const warning = document.createElement('p');
-    warning.className = 'mt-2 font-semibold text-rose-300';
+    warning.className = 'mt-2 font-semibold text-rose-500';
     warning.textContent = 'Įspėjimas: nurodytas duomenų perdavimas už ES/EEE ribų.';
     analysisPrivacy.append(warning);
   }
   if (privacy.marketing_without_consent) {
     const warning = document.createElement('p');
-    warning.className = 'mt-1 font-semibold text-rose-300';
+    warning.className = 'mt-1 font-semibold text-rose-500';
     warning.textContent = 'Įspėjimas: nurodytas duomenų naudojimas rinkodarai be sutikimo.';
     analysisPrivacy.append(warning);
   }
   const summary = document.createElement('p');
   summary.className = 'mt-2 text-alabaster-grey-50';
-  summary.textContent = `Privatumo santrauka: ${privacy.summary || 'Nenurodyta'}`;
+  summary.textContent = privacy.summary || 'Nenurodyta';
   analysisPrivacy.append(summary);
 }
 
@@ -487,16 +507,16 @@ function renderRisks(risks, hasAnalysis) {
   analysisRisks.append(heading);
   if (!orderedRisks.length) {
     const empty = document.createElement('p');
-    empty.className = 'mt-1 text-emerald-300';
+    empty.className = 'mt-1 text-emerald-600';
     empty.textContent = 'Kritinių ar paslėptų grėsmių dokumente neaptikta';
     analysisRisks.append(empty);
     return;
   }
 
   const levelStyles = {
-    high: ['Didelė', 'text-rose-300'],
-    medium: ['Vidutinė', 'text-yellow-300'],
-    low: ['Maža', 'text-emerald-300'],
+    high: ['Didelė', 'text-rose-500'],
+    medium: ['Vidutinė', 'text-yellow-500'],
+    low: ['Maža', 'text-emerald-600'],
   };
   const list = document.createElement('div');
   list.className = 'mt-2 space-y-3';
@@ -609,7 +629,7 @@ function renderDocuments(documents, filterActive = hasActiveFilters()) {
     const deleteButton = document.createElement('button');
     deleteButton.type = 'button';
     deleteButton.dataset.deleteDocumentId = document_.id;
-    deleteButton.className = 'shrink-0 rounded-xl border border-rose-400/70 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300';
+    deleteButton.className = 'shrink-0 rounded-xl border border-rose-400/70 px-3 py-2 text-xs font-semibold text-rose-500 transition hover:border-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-300';
     deleteButton.textContent = 'Ištrinti';
     const row = document.createElement('div');
     row.className = 'flex items-center gap-2';
@@ -687,10 +707,10 @@ async function confirmDelete() {
     }
     if (!response.ok) throw new Error('Delete request failed');
     if (previewDocument?.id === document_.id) closePreview();
-    showDocumentsMessage(DELETE_SUCCESS, 'text-emerald-300');
+    showDocumentsMessage(DELETE_SUCCESS, 'text-emerald-600');
     await loadDocuments();
   } catch {
-    showDocumentsMessage(DELETE_FAILED, 'text-rose-300');
+    showDocumentsMessage(DELETE_FAILED, 'text-rose-500');
   }
 }
 
@@ -726,7 +746,7 @@ document.addEventListener('keydown', (event) => {
 runComparisonButton.addEventListener('click', async () => {
   if (!firstVersionSelect.value || !secondVersionSelect.value || firstVersionSelect.value === secondVersionSelect.value) {
     comparisonMessage.textContent = 'Nepasirinkti dokumentai palyginimui';
-    comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-300';
+    comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-500';
     return;
   }
   runComparisonButton.disabled = true;
@@ -760,7 +780,7 @@ runComparisonButton.addEventListener('click', async () => {
       comparisonMessage.textContent = '';
     } else {
       comparisonMessage.textContent = 'Skirtumų nenustatyta.';
-      comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-emerald-300';
+      comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-emerald-600';
     }
     if (result.pdf_base64) {
       const pdfBytes = Uint8Array.from(atob(result.pdf_base64), (character) => character.charCodeAt(0));
@@ -775,7 +795,7 @@ runComparisonButton.addEventListener('click', async () => {
     }
   } catch {
     comparisonMessage.textContent = 'Dokumentų palyginti nepavyko';
-    comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-300';
+    comparisonMessage.className = 'mt-4 min-h-5 text-sm font-medium text-rose-500';
   } finally {
     runComparisonButton.disabled = false;
   }
@@ -809,7 +829,7 @@ chatForm.addEventListener('submit', async (event) => {
     chatMessage.textContent = '';
   } catch {
     chatMessage.textContent = 'Nepavyko sukurti pokalbio.';
-    chatMessage.className = 'mt-2 min-h-5 text-sm font-medium text-rose-300';
+    chatMessage.className = 'mt-2 min-h-5 text-sm font-medium text-rose-500';
   } finally {
     chatInput.disabled = false;
     chatInput.focus();
@@ -922,7 +942,7 @@ function applyFilters() {
 
   if (!filteredDocuments.length && active) {
     documentsMessage.textContent = 'Nėra dokumentų, atitinkančių pasirinktus filtrus.';
-    documentsMessage.className = 'mb-2 min-h-5 text-sm font-medium text-amber-300';
+    documentsMessage.className = 'mb-2 min-h-5 text-sm font-medium text-amber-500';
     return;
   }
 
@@ -994,7 +1014,7 @@ fileInput.addEventListener('change', () => {
   if (problem) {
     fileInput.value = '';
     fileName.textContent = 'Failas nepasirinktas';
-    showUploadMessage(problem, 'text-rose-300');
+    showUploadMessage(problem, 'text-rose-500');
   }
 });
 
@@ -1002,12 +1022,12 @@ uploadForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const file = fileInput.files[0];
   if (!file) {
-    showUploadMessage('Pirmiausia pasirinkite dokumentą.', 'text-amber-300');
+    showUploadMessage('Pirmiausia pasirinkite dokumentą.', 'text-amber-500');
     return;
   }
   const problem = validateFile(file);
   if (problem) {
-    showUploadMessage(problem, 'text-rose-300');
+    showUploadMessage(problem, 'text-rose-500');
     return;
   }
 
@@ -1027,15 +1047,15 @@ uploadForm.addEventListener('submit', async (event) => {
       return;
     }
     if (!response.ok) {
-      showUploadMessage(UPLOAD_FAILED, 'text-rose-300');
+      showUploadMessage(UPLOAD_FAILED, 'text-rose-500');
       return;
     }
-    showUploadMessage('Dokumentas išsaugotas sėkmingai', 'text-emerald-300');
+    showUploadMessage('Dokumentas išsaugotas sėkmingai', 'text-emerald-600');
     uploadForm.reset();
     fileName.textContent = 'Failas nepasirinktas';
     await loadDocuments();
   } catch {
-    showUploadMessage(UPLOAD_FAILED, 'text-rose-300');
+    showUploadMessage(UPLOAD_FAILED, 'text-rose-500');
   } finally {
     saveButton.disabled = false;
     saveButton.textContent = 'Išsaugoti';
