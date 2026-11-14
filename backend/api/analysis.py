@@ -228,7 +228,50 @@ def generate_risk_assessment(text):
     raise AnalysisError("Risk assessment failed")
 
 
-def create_summary_pdf(summary, output, risks=None):
+def generate_privacy_assessment(text):
+    prompt = (
+        "Išanalizuok dokumento asmens duomenų apsaugos ir privatumo sąlygas. "
+        "Atsakyk TIKTAI vienu JSON objektu be Markdown ar papildomo teksto tokiu "
+        "formatu: {\"collected_data\":\"...\",\"purposes\":\"...\","
+        "\"retention\":\"...\",\"third_parties\":\"...\","
+        "\"eea_transfer\":true,\"marketing_without_consent\":true,"
+        "\"summary\":\"...\"}. Nurodyk tik dokumente pagrįstą informaciją. Jei "
+        "informacija nenurodyta, parašyk „Nenurodyta“. Boolean reikšmė turi būti "
+        "true tik tada, kai dokumente aiškiai nurodytas atitinkamas perdavimas už "
+        "ES/EEE ribų arba rinkodara be sutikimo. summary turi būti aiški privatumo "
+        "rizikų ir duomenų tvarkymo santrauka lietuviškai.\n\n"
+        f"<document>\n{text}\n</document>"
+    )
+    providers = (
+        ("Gemini", get_gemini_provider),
+        ("Ollama", OllamaProvider),
+    )
+    required = ("collected_data", "purposes", "retention", "third_parties", "summary")
+    for name, factory in providers:
+        try:
+            cleaned = re.sub(
+                r"^```(?:json)?\s*|\s*```$",
+                "",
+                factory().generate(prompt).strip(),
+                flags=re.IGNORECASE,
+            )
+            result = json.loads(cleaned)
+            if (
+                not isinstance(result, dict)
+                or any(not isinstance(result.get(key), str) or not result[key].strip() for key in required)
+                or not isinstance(result.get("eea_transfer"), bool)
+                or not isinstance(result.get("marketing_without_consent"), bool)
+            ):
+                raise AnalysisError("Privacy assessment contained incomplete data")
+            return result
+        except (MissingGeminiAPIKey, APIError, requests.RequestException,
+                httpx.HTTPError, AIProviderError, OSError, ValueError,
+                AnalysisError, json.JSONDecodeError) as error:
+            logger.warning("%s privacy assessment failed: %s", name, type(error).__name__)
+    raise AnalysisError("Privacy assessment failed")
+
+
+def create_summary_pdf(summary, output, risks=None, privacy=None):
     configured = os.getenv("SUMMARY_PDF_FONT")
     candidates = [Path(configured)] if configured else [
         Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "arial.ttf",
@@ -261,4 +304,29 @@ def create_summary_pdf(summary, output, risks=None):
                 style,
             ))
             content.append(Spacer(1, 8))
+    privacy = privacy or {}
+    content.append(Spacer(1, 18))
+    content.append(Paragraph("Asmens duomenų apsauga ir privatumas", style))
+    privacy_labels = (
+        ("Renkami asmens duomenys", "collected_data"),
+        ("Duomenų naudojimo tikslas", "purposes"),
+        ("Saugojimo terminas", "retention"),
+        ("Perdavimas trečiosioms šalims / partneriams", "third_parties"),
+    )
+    for label, key in privacy_labels:
+        content.append(Paragraph(f"<b>{label}:</b> {escape(str(privacy.get(key, 'Nenurodyta')))}", style))
+    if privacy.get("eea_transfer"):
+        content.append(Paragraph(
+            "<b>Įspėjimas:</b> dokumente nurodytas asmens duomenų perdavimas už ES/EEE ribų.",
+            style,
+        ))
+    if privacy.get("marketing_without_consent"):
+        content.append(Paragraph(
+            "<b>Įspėjimas:</b> dokumente nurodytas duomenų naudojimas rinkodarai be sutikimo.",
+            style,
+        ))
+    content.append(Paragraph(
+        f"<b>Privatumo santrauka:</b> {escape(str(privacy.get('summary', 'Nenurodyta')))}",
+        style,
+    ))
     SimpleDocTemplate(output).build(content)

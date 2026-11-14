@@ -113,6 +113,7 @@ document.querySelector('#app').innerHTML = `
           <p id="analysis-status" class="mt-2" aria-live="polite"></p>
           <p id="analysis-summary" class="mt-2 whitespace-pre-wrap text-alabaster-grey-50"></p>
           <div id="analysis-risks" class="mt-3 hidden"></div>
+          <div id="analysis-privacy" class="mt-3 hidden"></div>
           <div class="mt-2 flex items-center justify-end gap-3">
             <a id="analysis-download" class="hidden font-semibold text-pacific-blue-300" download>Gauti santrauką</a>
             <button id="save-analysis-button" type="button" class="hidden rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 disabled:opacity-50">
@@ -194,6 +195,7 @@ const analyzeButton = document.querySelector('#analyze-button');
 const analysisStatus = document.querySelector('#analysis-status');
 const analysisSummary = document.querySelector('#analysis-summary');
 const analysisRisks = document.querySelector('#analysis-risks');
+const analysisPrivacy = document.querySelector('#analysis-privacy');
 const saveAnalysisButton = document.querySelector('#save-analysis-button');
 const analysisDownload = document.querySelector('#analysis-download');
 const analyzingDocuments = new Set();
@@ -390,6 +392,7 @@ function renderAnalysis(document_) {
   const generatedAnalysis = generatedAnalyses.get(document_.id);
   const summary = generatedAnalysis?.summary || document_.simplified_explanation || '';
   const risks = generatedAnalysis?.risks || document_.risk_assessment || [];
+  const privacy = generatedAnalysis?.privacy || document_.privacy_assessment || {};
   analyzeButton.disabled = analyzing;
   if (analyzing) {
     analysisStatus.textContent = 'Dokumentas analizuojamas...';
@@ -398,9 +401,49 @@ function renderAnalysis(document_) {
   }
   analysisSummary.textContent = summary;
   renderRisks(risks, Boolean(summary || generatedAnalysis));
+  renderPrivacy(privacy, Boolean(summary || generatedAnalysis));
   saveAnalysisButton.classList.toggle('hidden', !generatedAnalysis);
   analysisDownload.classList.toggle('hidden', !document_.simplified_explanation);
   analysisDownload.href = `/api/documents/${document_.id}/summary.pdf`;
+}
+
+function renderPrivacy(privacy, hasAnalysis) {
+  analysisPrivacy.replaceChildren();
+  analysisPrivacy.classList.toggle('hidden', !hasAnalysis);
+  if (!hasAnalysis) return;
+
+  const heading = document.createElement('h3');
+  heading.className = 'font-semibold text-alabaster-grey-50';
+  heading.textContent = 'Asmens duomenų apsauga ir privatumas';
+  analysisPrivacy.append(heading);
+  const fields = [
+    ['Renkami asmens duomenys', privacy.collected_data],
+    ['Duomenų naudojimo tikslas', privacy.purposes],
+    ['Saugojimo terminas', privacy.retention],
+    ['Perdavimas trečiosioms šalims / partneriams', privacy.third_parties],
+  ];
+  for (const [label, value] of fields) {
+    const item = document.createElement('p');
+    item.className = 'mt-1';
+    item.append(`${label}: ${value || 'Nenurodyta'}`);
+    analysisPrivacy.append(item);
+  }
+  if (privacy.eea_transfer) {
+    const warning = document.createElement('p');
+    warning.className = 'mt-2 font-semibold text-rose-300';
+    warning.textContent = 'Įspėjimas: nurodytas duomenų perdavimas už ES/EEE ribų.';
+    analysisPrivacy.append(warning);
+  }
+  if (privacy.marketing_without_consent) {
+    const warning = document.createElement('p');
+    warning.className = 'mt-1 font-semibold text-rose-300';
+    warning.textContent = 'Įspėjimas: nurodytas duomenų naudojimas rinkodarai be sutikimo.';
+    analysisPrivacy.append(warning);
+  }
+  const summary = document.createElement('p');
+  summary.className = 'mt-2 text-alabaster-grey-50';
+  summary.textContent = `Privatumo santrauka: ${privacy.summary || 'Nenurodyta'}`;
+  analysisPrivacy.append(summary);
 }
 
 function renderRisks(risks, hasAnalysis) {
@@ -467,7 +510,11 @@ analyzeButton.addEventListener('click', async () => {
     }
     if (!response.ok) throw new Error('Analysis request failed');
     const result = await response.json();
-    generatedAnalyses.set(document_.id, { summary: result.summary, risks: result.risks || [] });
+    generatedAnalyses.set(document_.id, {
+      summary: result.summary,
+      risks: result.risks || [],
+      privacy: result.privacy || {},
+    });
     if (previewDocument?.id === document_.id) renderAnalysis(document_);
   } catch {
     if (previewDocument?.id === document_.id) analysisStatus.textContent = 'Analizė nepavyko, bandykite dar kartą';
@@ -485,7 +532,7 @@ saveAnalysisButton.addEventListener('click', async () => {
   const document_ = previewDocument;
   const generatedAnalysis = document_ && generatedAnalyses.get(document_.id);
   if (!document_ || !generatedAnalysis) return;
-  const { summary, risks } = generatedAnalysis;
+  const { summary, risks, privacy } = generatedAnalysis;
   saveAnalysisButton.disabled = true;
   try {
     const response = await fetch(`/api/documents/${document_.id}/analysis/save/`, {
@@ -495,7 +542,7 @@ saveAnalysisButton.addEventListener('click', async () => {
         'X-CSRFToken': await getCsrfToken(),
       },
       credentials: 'same-origin',
-      body: JSON.stringify({ summary, risks }),
+      body: JSON.stringify({ summary, risks, privacy }),
     });
     if (response.status === 401) {
       window.location.replace('/login');
@@ -504,6 +551,7 @@ saveAnalysisButton.addEventListener('click', async () => {
     if (!response.ok) throw new Error('Analysis save request failed');
     document_.simplified_explanation = summary;
     document_.risk_assessment = risks;
+    document_.privacy_assessment = privacy;
     generatedAnalyses.delete(document_.id);
     renderAnalysis(document_);
     showAnalysisSuccess(document_.id);

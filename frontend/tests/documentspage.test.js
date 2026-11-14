@@ -296,6 +296,35 @@ describe('documents page', () => {
       expect(riskText.indexOf('Vidutinė rizika · C')).toBeLessThan(riskText.indexOf('Maža rizika · B'));
     });
 
+    it('renders privacy processing details and warnings', async () => {
+      await loadPage({
+        ...baseRoutes(),
+        'GET /api/documents/1/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+        'POST /api/documents/1/analysis/': () => json({
+          summary: 'Santrauka.',
+          risks: [],
+          privacy: {
+            collected_data: 'Vardas ir el. paštas',
+            purposes: 'Sutarties vykdymas',
+            retention: '5 metus',
+            third_parties: 'Partneriams',
+            eea_transfer: true,
+            marketing_without_consent: true,
+            summary: 'Reikalingas papildomas dėmesys.',
+          },
+        }),
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#analyze-button').click();
+      await flush();
+      const privacyText = $('#analysis-privacy').textContent;
+      expect(privacyText).toContain('Asmens duomenų apsauga ir privatumas');
+      expect(privacyText).toContain('Vardas ir el. paštas');
+      expect(privacyText).toContain('už ES/EEE ribų');
+      expect(privacyText).toContain('rinkodarai be sutikimo');
+    });
+
     it('saves the generated summary and shows a success message', async () => {
       let saveOptions;
       await loadPage({
@@ -315,7 +344,11 @@ describe('documents page', () => {
       $('#save-analysis-button').click();
       for (let i = 0; i < 5; i += 1) await Promise.resolve();
       expect(saveOptions.headers['X-CSRFToken']).toBe('token123');
-      expect(JSON.parse(saveOptions.body)).toEqual({ summary: 'Svarbiausios sąlygos.', risks: [] });
+      expect(JSON.parse(saveOptions.body)).toEqual({
+        summary: 'Svarbiausios sąlygos.',
+        risks: [],
+        privacy: {},
+      });
       expect($('#analysis-status').textContent).toBe('Analizė sėkmingai išsaugota');
       expect($('#save-analysis-button').classList.contains('hidden')).toBe(true);
       expect($('#analysis-download').classList.contains('hidden')).toBe(false);
