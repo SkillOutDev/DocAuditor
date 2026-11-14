@@ -5,7 +5,7 @@ from io import BytesIO
 from django.http import FileResponse, JsonResponse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework.serializers import CharField, Serializer
+from rest_framework.serializers import CharField, JSONField, Serializer
 from rest_framework.views import APIView
 
 from api.analysis import (
@@ -14,6 +14,7 @@ from api.analysis import (
     create_summary_pdf,
     extract_document_text,
     generate_summary,
+    generate_risk_assessment,
 )
 from api.models import Document
 from api.views.documents import DocumentErrorResponseSerializer, ManualDocumentAuthenticationPermission
@@ -27,6 +28,7 @@ class AnalysisResponseSerializer(Serializer):
         max_length=OLLAMA_MAX_SUMMARY_LENGTH,
         help_text="Gemini summaries are limited to 700 characters; Ollama summaries to 2000.",
     )
+    risks = JSONField()
 
 
 class SaveAnalysisRequestSerializer(Serializer):
@@ -34,11 +36,13 @@ class SaveAnalysisRequestSerializer(Serializer):
         max_length=OLLAMA_MAX_SUMMARY_LENGTH,
         allow_blank=False,
     )
+    risks = JSONField(required=False, default=list)
 
 
 class SaveAnalysisResponseSerializer(Serializer):
     message = CharField()
     summary = CharField(max_length=OLLAMA_MAX_SUMMARY_LENGTH)
+    risks = JSONField()
 
 
 class DocumentAnalysisView(APIView):
@@ -67,7 +71,14 @@ class DocumentAnalysisView(APIView):
             summary = generate_summary(text)
         except AnalysisError:
             return JsonResponse({"message": FAILURE_MESSAGE}, status=502)
-        return JsonResponse({"summary": summary})
+        try:
+            risks = generate_risk_assessment(text)
+        except AnalysisError:
+            return JsonResponse(
+                {"message": "Nepavyko atlikti rizikų vertinimo, bandykite analizuoti iš naujo"},
+                status=502,
+            )
+        return JsonResponse({"summary": summary, "risks": risks})
 
 
 class DocumentAnalysisSaveView(APIView):
@@ -96,6 +107,7 @@ class DocumentAnalysisSaveView(APIView):
         except json.JSONDecodeError:
             payload = {}
         summary = payload.get("summary")
+        risks = payload.get("risks", [])
         if not isinstance(summary, str) or not summary.strip():
             return JsonResponse(
                 {"message": "Analizės išsaugoti nepavyko.", "errors": {"summary": "Santrauka negali būti tuščia."}},
@@ -107,11 +119,23 @@ class DocumentAnalysisSaveView(APIView):
                 {"message": "Analizės išsaugoti nepavyko.", "errors": {"summary": "Santrauka per ilga."}},
                 status=400,
             )
+        if not isinstance(risks, list):
+            return JsonResponse(
+                {"message": "Analizės išsaugoti nepavyko.", "errors": {"risks": "Netinkamas rizikų formatas."}},
+                status=400,
+            )
         document.simplified_explanation = summary
+        document.risk_assessment = risks
         document.analysis_status = Document.AnalysisStatus.COMPLETED
         document.analysis_error = ""
-        document.save(update_fields=["simplified_explanation", "analysis_status", "analysis_error", "updated_at"])
-        return JsonResponse({"message": "Analizė sėkmingai išsaugota", "summary": summary})
+        document.save(update_fields=[
+            "simplified_explanation",
+            "risk_assessment",
+            "analysis_status",
+            "analysis_error",
+            "updated_at",
+        ])
+        return JsonResponse({"message": "Analizė sėkmingai išsaugota", "summary": summary, "risks": risks})
 
 
 class DocumentSummaryPDFView(APIView):
@@ -132,7 +156,7 @@ class DocumentSummaryPDFView(APIView):
             return JsonResponse({"message": "Santraukos rasti nepavyko."}, status=404)
         output = BytesIO()
         try:
-            create_summary_pdf(document.simplified_explanation, output)
+            create_summary_pdf(document.simplified_explanation, output, document.risk_assessment)
         except (AnalysisError, OSError, ValueError) as error:
             logger.error("Summary PDF generation failed (%s)", type(error).__name__)
             return JsonResponse({"message": "Nepavyko sukurti santraukos."}, status=500)

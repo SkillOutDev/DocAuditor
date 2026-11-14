@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const flush = async () => {
   for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -44,6 +44,10 @@ const submitForm = () => $('#upload-form').dispatchEvent(new Event('submit', { c
 const pdf = (name = 'a.pdf', size = 10) => new File([new Uint8Array(size)], name, { type: 'application/pdf' });
 
 describe('documents page', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     calls = [];
     location = { replace: vi.fn(), assign: vi.fn() };
@@ -265,7 +269,31 @@ describe('documents page', () => {
       expect($('#analysis-summary').textContent).toBe('Svarbiausios sąlygos.');
       expect($('#save-analysis-button').classList.contains('hidden')).toBe(false);
       expect($('#analysis-download').classList.contains('hidden')).toBe(true);
+      expect($('#analysis-risks').textContent).toContain('Kritinių ar paslėptų grėsmių dokumente neaptikta');
       expect($('#analyze-button').disabled).toBe(false);
+    });
+
+    it('renders categorized risks with level, explanation and clause', async () => {
+      await loadPage({
+        ...baseRoutes(),
+        'GET /api/documents/1/preview/': () => ({ ok: true, blob: async () => new Blob(['x'], { type: 'application/pdf' }) }),
+        'POST /api/documents/1/analysis/': () => json({
+          summary: 'Svarbiausios sąlygos.',
+          risks: [
+            { level: 'low', category: 'B', explanation: 'Maža.', clause: '3 punktas' },
+            { level: 'high', category: 'A', explanation: 'Didelė.', clause: '1 punktas' },
+            { level: 'medium', category: 'C', explanation: 'Vidutinė.', clause: '2 punktas' },
+          ],
+        }),
+      });
+      $('[data-document-id="1"]').click();
+      await flush();
+      $('#analyze-button').click();
+      await flush();
+      expect($('#analysis-risks').classList.contains('hidden')).toBe(false);
+      const riskText = $('#analysis-risks').textContent;
+      expect(riskText.indexOf('Didelė rizika · A')).toBeLessThan(riskText.indexOf('Vidutinė rizika · C'));
+      expect(riskText.indexOf('Vidutinė rizika · C')).toBeLessThan(riskText.indexOf('Maža rizika · B'));
     });
 
     it('saves the generated summary and shows a success message', async () => {
@@ -287,7 +315,7 @@ describe('documents page', () => {
       $('#save-analysis-button').click();
       for (let i = 0; i < 5; i += 1) await Promise.resolve();
       expect(saveOptions.headers['X-CSRFToken']).toBe('token123');
-      expect(JSON.parse(saveOptions.body)).toEqual({ summary: 'Svarbiausios sąlygos.' });
+      expect(JSON.parse(saveOptions.body)).toEqual({ summary: 'Svarbiausios sąlygos.', risks: [] });
       expect($('#analysis-status').textContent).toBe('Analizė sėkmingai išsaugota');
       expect($('#save-analysis-button').classList.contains('hidden')).toBe(true);
       expect($('#analysis-download').classList.contains('hidden')).toBe(false);

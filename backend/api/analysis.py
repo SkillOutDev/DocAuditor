@@ -1,5 +1,7 @@
 import logging
+import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -25,6 +27,8 @@ logger = logging.getLogger(__name__)
 MAX_TEXT_LENGTH = 100_000
 GEMINI_MAX_SUMMARY_LENGTH = 700
 OLLAMA_MAX_SUMMARY_LENGTH = 2000
+RISK_LEVELS = {"high", "medium", "low"}
+RISK_LEVEL_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 class AnalysisError(Exception):
@@ -164,7 +168,67 @@ def generate_summary(text):
     raise AnalysisError("Both AI providers failed")
 
 
-def create_summary_pdf(summary, output):
+def _parse_risk_response(response):
+    cleaned = response.strip()
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE)
+    try:
+        payload = json.loads(cleaned)
+    except json.JSONDecodeError as error:
+        raise AnalysisError("Risk assessment was not valid JSON") from error
+    risks = payload.get("risks") if isinstance(payload, dict) else payload
+    if not isinstance(risks, list):
+        raise AnalysisError("Risk assessment did not contain a risk list")
+
+    normalized = []
+    for risk in risks:
+        if not isinstance(risk, dict):
+            raise AnalysisError("Risk assessment contained an invalid risk")
+        level = str(risk.get("level", "")).strip().lower()
+        level = {"didelė": "high", "didele": "high", "vidutinė": "medium",
+                 "vidutine": "medium", "maža": "low", "maza": "low"}.get(level, level)
+        category = str(risk.get("category", "")).strip()
+        explanation = str(risk.get("explanation", "")).strip()
+        clause = str(risk.get("clause", "")).strip()
+        if level not in RISK_LEVELS or not category or not explanation or not clause:
+            raise AnalysisError("Risk assessment contained incomplete risk data")
+        normalized.append({
+            "level": level,
+            "category": category,
+            "explanation": explanation,
+            "clause": clause,
+        })
+    return sorted(normalized, key=lambda risk: RISK_LEVEL_ORDER[risk["level"]])
+
+
+def generate_risk_assessment(text):
+    prompt = (
+        "Atlik teisinio dokumento rizikų vertinimą lietuviškai. Atsakyk TIKTAI "
+        "vienu JSON objektu be Markdown, kodo blokų ar papildomo teksto. Naudok "
+        "tokį formatą: {\"risks\":[{\"level\":\"high|medium|low\","
+        "\"category\":\"...\",\"explanation\":\"kuo tai gresia klientui\","
+        "\"clause\":\"susijęs sutarties punktas arba skyriaus pavadinimas\"}]}. "
+        "Įtrauk tik realias, dokumento tekstu pagrįstas rizikas. Jei rizikų nėra, "
+        "grąžink {\"risks\":[]}. Nekurk faktų, punktų ar grėsmių, kurių dokumente "
+        "nėra. Vertink terminus, mokėjimus, atsakomybę, vienašališkas teises, "
+        "nutraukimą, duomenų apsaugą ir kitus klientui svarbius aspektus. "
+        "level reikšmės turi būti tik high, medium arba low.\n\n"
+        f"<document>\n{text}\n</document>"
+    )
+    providers = (
+        ("Gemini", get_gemini_provider),
+        ("Ollama", OllamaProvider),
+    )
+    for name, factory in providers:
+        try:
+            risks = _parse_risk_response(factory().generate(prompt))
+            return risks
+        except (MissingGeminiAPIKey, APIError, requests.RequestException,
+                httpx.HTTPError, AIProviderError, OSError, ValueError, AnalysisError) as error:
+            logger.warning("%s risk assessment failed: %s", name, type(error).__name__)
+    raise AnalysisError("Risk assessment failed")
+
+
+def create_summary_pdf(summary, output, risks=None):
     configured = os.getenv("SUMMARY_PDF_FONT")
     candidates = [Path(configured)] if configured else [
         Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "arial.ttf",
@@ -178,4 +242,23 @@ def create_summary_pdf(summary, output):
                            leading=16, textColor=colors.black, splitLongWords=True)
     content = [Paragraph("Dokumento santrauka", style), Spacer(1, 16)]
     content.extend(Paragraph(escape(line), style) for line in summary.splitlines() if line.strip())
+    content.append(Spacer(1, 18))
+    content.append(Paragraph("Nustatytos rizikos ir grėsmės", style))
+    risk_items = risks or []
+    if not risk_items:
+        content.append(Paragraph("Kritinių ar paslėptų grėsmių dokumente neaptikta", style))
+    else:
+        level_labels = {"high": "Didelė", "medium": "Vidutinė", "low": "Maža"}
+        for risk in sorted(risk_items, key=lambda item: RISK_LEVEL_ORDER.get(item.get("level"), 3)):
+            level = level_labels.get(risk.get("level"), "Nežinoma")
+            category = escape(str(risk.get("category", "")))
+            explanation = escape(str(risk.get("explanation", "")))
+            clause = escape(str(risk.get("clause", "")))
+            content.append(Paragraph(
+                f"<b>{level} rizika · {category}</b><br/>"
+                f"{explanation}<br/>"
+                f"<font size='9'>Susijęs punktas: {clause}</font>",
+                style,
+            ))
+            content.append(Spacer(1, 8))
     SimpleDocTemplate(output).build(content)

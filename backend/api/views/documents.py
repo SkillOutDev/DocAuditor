@@ -42,6 +42,7 @@ class DocumentSerializer(Serializer):
     content_type = CharField(allow_blank=True)
     analysis_status = CharField()
     simplified_explanation = CharField(allow_blank=True)
+    risk_assessment = JSONField()
     created_at = CharField()
 
 
@@ -99,6 +100,7 @@ def _serialize_document(document):
         "content_type": document.content_type,
         "analysis_status": document.analysis_status,
         "simplified_explanation": document.simplified_explanation,
+        "risk_assessment": document.risk_assessment,
         "created_at": document.created_at.isoformat(),
     }
 
