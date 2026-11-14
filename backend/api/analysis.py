@@ -281,15 +281,32 @@ def create_summary_pdf(summary, output, risks=None, privacy=None):
     if font is None:
         raise AnalysisError("Unicode PDF font not found; configure SUMMARY_PDF_FONT")
     pdfmetrics.registerFont(TTFont("SummaryUnicode", str(font)))
-    style = ParagraphStyle("Summary", fontName="SummaryUnicode", fontSize=11,
-                           leading=16, textColor=colors.black, splitLongWords=True)
-    content = [Paragraph("Dokumento santrauka", style), Spacer(1, 16)]
-    content.extend(Paragraph(escape(line), style) for line in summary.splitlines() if line.strip())
-    content.append(Spacer(1, 18))
-    content.append(Paragraph("Nustatytos rizikos ir grėsmės", style))
+    body_style = ParagraphStyle(
+        "SummaryBody", fontName="SummaryUnicode", fontSize=11,
+        leading=16, spaceAfter=8, textColor=colors.HexColor("#172033"),
+        splitLongWords=True,
+    )
+    title_style = ParagraphStyle(
+        "SummaryTitle", parent=body_style, fontSize=20, leading=25,
+        spaceAfter=18, textColor=colors.HexColor("#0b3558"),
+        keepWithNext=True,
+    )
+    section_style = ParagraphStyle(
+        "SummarySection", parent=body_style, fontSize=14, leading=19,
+        spaceBefore=16, spaceAfter=10, textColor=colors.HexColor("#0b5378"),
+        keepWithNext=True,
+    )
+    detail_style = ParagraphStyle(
+        "SummaryDetail", parent=body_style, fontSize=10, leading=14,
+        spaceAfter=10,
+        textColor=colors.HexColor("#40516a"),
+    )
+    content = [Paragraph("Dokumento santrauka", title_style)]
+    content.extend(Paragraph(escape(line), body_style) for line in summary.splitlines() if line.strip())
+    content.append(Paragraph("Nustatytos rizikos ir grėsmės", section_style))
     risk_items = risks or []
     if not risk_items:
-        content.append(Paragraph("Kritinių ar paslėptų grėsmių dokumente neaptikta", style))
+        content.append(Paragraph("Kritinių ar paslėptų grėsmių dokumente neaptikta", body_style))
     else:
         level_labels = {"high": "Didelė", "medium": "Vidutinė", "low": "Maža"}
         for risk in sorted(risk_items, key=lambda item: RISK_LEVEL_ORDER.get(item.get("level"), 3)):
@@ -298,15 +315,13 @@ def create_summary_pdf(summary, output, risks=None, privacy=None):
             explanation = escape(str(risk.get("explanation", "")))
             clause = escape(str(risk.get("clause", "")))
             content.append(Paragraph(
-                f"<b>{level} rizika · {category}</b><br/>"
-                f"{explanation}<br/>"
-                f"<font size='9'>Susijęs punktas: {clause}</font>",
-                style,
+                f"<b>{level} rizika · {category}</b><br/>{explanation}",
+                body_style,
             ))
-            content.append(Spacer(1, 8))
+            content.append(Paragraph(f"Susijęs punktas: {clause}", detail_style))
+            content.append(Spacer(1, 5))
     privacy = privacy or {}
-    content.append(Spacer(1, 18))
-    content.append(Paragraph("Asmens duomenų apsauga ir privatumas", style))
+    content.append(Paragraph("Asmens duomenų apsauga ir privatumas", section_style))
     privacy_labels = (
         ("Renkami asmens duomenys", "collected_data"),
         ("Duomenų naudojimo tikslas", "purposes"),
@@ -314,19 +329,27 @@ def create_summary_pdf(summary, output, risks=None, privacy=None):
         ("Perdavimas trečiosioms šalims / partneriams", "third_parties"),
     )
     for label, key in privacy_labels:
-        content.append(Paragraph(f"<b>{label}:</b> {escape(str(privacy.get(key, 'Nenurodyta')))}", style))
+        content.append(Paragraph(f"<b>{label}</b>", body_style))
+        content.append(Paragraph(escape(str(privacy.get(key, "Nenurodyta"))), detail_style))
     if privacy.get("eea_transfer"):
         content.append(Paragraph(
             "<b>Įspėjimas:</b> dokumente nurodytas asmens duomenų perdavimas už ES/EEE ribų.",
-            style,
+            body_style,
         ))
     if privacy.get("marketing_without_consent"):
         content.append(Paragraph(
             "<b>Įspėjimas:</b> dokumente nurodytas duomenų naudojimas rinkodarai be sutikimo.",
-            style,
+            body_style,
         ))
     content.append(Paragraph(
-        f"<b>Privatumo santrauka:</b> {escape(str(privacy.get('summary', 'Nenurodyta')))}",
-        style,
+        escape(str(privacy.get('summary', 'Nenurodyta'))),
+        body_style,
     ))
-    SimpleDocTemplate(output).build(content)
+    SimpleDocTemplate(
+        output,
+        leftMargin=54,
+        rightMargin=54,
+        topMargin=48,
+        bottomMargin=48,
+        title="Dokumento santrauka",
+    ).build(content)

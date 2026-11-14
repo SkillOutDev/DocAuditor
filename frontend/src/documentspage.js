@@ -129,16 +129,16 @@ document.querySelector('#app').innerHTML = `
         </header>
         <div id="analysis-layout" class="grid min-h-0 flex-1 lg:grid-cols-1">
           <div id="analysis-panel" class="min-h-0 max-h-[45vh] overflow-y-auto border-b border-charcoal-blue-700/80 px-5 py-3 text-sm text-powder-blue-300 lg:max-h-none lg:border-b-0 lg:border-r">
-            <p id="analysis-status" class="mt-2" aria-live="polite"></p>
-            <p id="analysis-summary" class="mt-2 whitespace-pre-wrap text-alabaster-grey-50"></p>
-            <div id="analysis-risks" class="mt-3 hidden"></div>
-            <div id="analysis-privacy" class="mt-3 hidden"></div>
-            <div class="mt-2 flex items-center justify-end gap-3">
+            <div class="mb-3 flex items-center justify-end gap-3 border-b border-charcoal-blue-700/80 pb-3">
               <a id="analysis-download" class="hidden font-semibold text-pacific-blue-300" download>Gauti santrauką</a>
               <button id="save-analysis-button" type="button" class="hidden rounded-xl bg-pacific-blue-500 px-4 py-2 text-sm font-semibold text-carbon-black-950 disabled:opacity-50">
                 Išsaugoti analizę
               </button>
             </div>
+            <p id="analysis-status" class="mt-2" aria-live="polite"></p>
+            <p id="analysis-summary" class="mt-2 whitespace-pre-wrap text-alabaster-grey-50"></p>
+            <div id="analysis-risks" class="mt-3 hidden"></div>
+            <div id="analysis-privacy" class="mt-3 hidden"></div>
           </div>
           <div class="flex min-h-0 flex-col">
             <p id="preview-status" class="hidden px-5 py-4 text-sm text-powder-blue-400" aria-live="polite"></p>
