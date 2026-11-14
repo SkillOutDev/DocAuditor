@@ -71,6 +71,27 @@ describe('documents page', () => {
       expect($('#documents-status').textContent).toBe('Nėra įkeltų dokumentų.');
     });
 
+    it('sorts documents by title and date in the selected direction', async () => {
+      const documents = [
+        { ...doc, id: 1, original_filename: 'beta.pdf', title: 'beta', created_at: '2026-02-01T10:00:00Z' },
+        { ...doc, id: 2, original_filename: 'alpha.pdf', title: 'alpha', created_at: '2026-01-01T10:00:00Z' },
+        { ...doc, id: 3, original_filename: 'gamma.pdf', title: 'gamma', created_at: '2026-03-01T10:00:00Z' },
+      ];
+
+      await loadPage(baseRoutes(documents));
+      const titlesInOrder = [...document.querySelectorAll('#documents-list [data-document-id]')].map((button) => button.querySelector('span')?.textContent || button.textContent.trim());
+      expect(titlesInOrder).toEqual(['alpha.pdf', 'beta.pdf', 'gamma.pdf']);
+
+      $('#sort-by').value = 'date';
+      $('#sort-direction').value = 'desc';
+      $('#sort-by').dispatchEvent(new Event('change'));
+      $('#sort-direction').dispatchEvent(new Event('change'));
+      await flush();
+
+      const titlesByDate = [...document.querySelectorAll('#documents-list [data-document-id]')].map((button) => button.querySelector('span')?.textContent || button.textContent.trim());
+      expect(titlesByDate).toEqual(['gamma.pdf', 'beta.pdf', 'alpha.pdf']);
+    });
+
     it('redirects to login on 401', async () => {
       await loadPage({ 'GET /api/documents/': () => json({}, 401) });
       expect(location.replace).toHaveBeenCalledWith('/login');
