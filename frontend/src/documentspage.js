@@ -46,7 +46,15 @@ document.querySelector('#app').innerHTML = `
           </label>
           <label class="block">
             <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Data</span>
-            <input id="filter-date" type="date" class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-3 py-2 text-sm text-alabaster-grey-50 outline-none transition focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20" />
+            <div class="relative">
+              <input id="filter-date" type="text" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" aria-label="Data (metai-mėnuo-diena)" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" class="w-full rounded-xl border border-charcoal-blue-600 bg-carbon-black-950 px-3 py-2 pr-10 text-sm text-alabaster-grey-50 outline-none transition placeholder:text-charcoal-blue-400 focus:border-pacific-blue-400 focus:ring-2 focus:ring-pacific-blue-400/20" />
+              <button id="filter-date-picker" type="button" aria-label="Pasirinkti datą" title="Pasirinkti datą" class="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-powder-blue-400 transition hover:text-pacific-blue-300">
+                <svg aria-hidden="true" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3v3m10-3v3M4.5 9.5h15M6 5h12a2 2 0 0 1 2 2v11.5A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5V7a2 2 0 0 1 2-2Z" />
+                </svg>
+              </button>
+              <input id="filter-date-native" type="date" tabindex="-1" aria-hidden="true" class="date-picker-native" />
+            </div>
           </label>
           <label class="block">
             <span class="mb-1 block text-xs font-medium uppercase tracking-[0.2em] text-powder-blue-400">Tipas</span>
@@ -203,6 +211,8 @@ const filterForm = document.querySelector('#documents-filter-form');
 const filterTitleInput = document.querySelector('#filter-title');
 const filterTitleSuggestions = document.querySelector('#filter-title-suggestions');
 const filterDateInput = document.querySelector('#filter-date');
+const filterDatePicker = document.querySelector('#filter-date-picker');
+const filterDateNative = document.querySelector('#filter-date-native');
 const filterTypeSelect = document.querySelector('#filter-type');
 const sortBySelect = document.querySelector('#sort-by');
 const sortDirectionSelect = document.querySelector('#sort-direction');
@@ -651,12 +661,25 @@ filterTitleInput.addEventListener('blur', () => {
   window.setTimeout(hideTitleSuggestions, 120);
 });
 
+filterDatePicker.addEventListener('click', () => {
+  if (typeof filterDateNative.showPicker === 'function') {
+    filterDateNative.showPicker();
+    return;
+  }
+  filterDateNative.click();
+});
+
+filterDateNative.addEventListener('change', () => {
+  filterDateInput.value = filterDateNative.value;
+});
+
 sortBySelect.addEventListener('change', applyFilters);
 sortDirectionSelect.addEventListener('change', applyFilters);
 
 clearFiltersButton.addEventListener('click', () => {
   filterTitleInput.value = '';
   filterDateInput.value = '';
+  filterDateNative.value = '';
   filterTypeSelect.value = '';
   sortBySelect.value = 'title';
   sortDirectionSelect.value = 'asc';

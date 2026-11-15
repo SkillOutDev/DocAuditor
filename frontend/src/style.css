@@ -77,6 +77,14 @@ body {
   transition: background-color 200ms ease, color 200ms ease;
 }
 
+.date-picker-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .landing-page {
   position: relative;
   isolation: isolate;
