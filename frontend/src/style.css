@@ -77,6 +77,51 @@ body {
   transition: background-color 200ms ease, color 200ms ease;
 }
 
+.landing-page {
+  position: relative;
+  isolation: isolate;
+}
+
+.landing-page::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: linear-gradient(rgb(116 180 190 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(116 180 190 / 0.035) 1px, transparent 1px);
+  background-size: 4rem 4rem;
+  content: '';
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
+}
+
+.hero-gradient {
+  background: linear-gradient(110deg, var(--color-pacific-blue-300), var(--color-pacific-blue-500));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.preview-glow {
+  position: absolute;
+  top: 10%;
+  left: 15%;
+  width: 70%;
+  height: 70%;
+  border-radius: 999px;
+  background: var(--color-pacific-blue-500);
+  filter: blur(80px);
+  opacity: 0.12;
+}
+
+.feature-card {
+  transition: border-color 200ms ease, transform 200ms ease, background-color 200ms ease;
+}
+
+.feature-card:hover {
+  border-color: var(--color-pacific-blue-700);
+  background-color: var(--color-charcoal-blue-900);
+  transform: translateY(-2px);
+}
+
 .theme-toggle {
   position: fixed !important;
   top: max(1rem, env(safe-area-inset-top));
@@ -141,4 +186,9 @@ body.light-theme,
 .light-theme .shadow-black\/20,
 .light-theme .shadow-black\/40 {
   --tw-shadow-color: rgb(87 96 117 / 0.18);
+}
+
+.light-theme .landing-page::before {
+  background-image: linear-gradient(rgb(64 86 39 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(64 86 39 / 0.06) 1px, transparent 1px);
 }
